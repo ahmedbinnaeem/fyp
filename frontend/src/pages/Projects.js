@@ -217,6 +217,18 @@ const Projects = () => {
     ] : []),
   ];
 
+  const initialValues = {
+    name: '',
+    description: '',
+    startDate: '',
+    endDate: '',
+    status: 'Not Started',
+    team: [],
+    teamLead: '',
+    budget: 0,
+    createdBy: user?._id,
+  };
+
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
@@ -268,10 +280,7 @@ const Projects = () => {
               form={form}
               layout="vertical"
               onFinish={handleSubmit}
-              initialValues={{
-                status: 'Not Started',
-                progress: 0,
-              }}
+              initialValues={initialValues}
             >
               <Form.Item
                 name="name"
@@ -346,22 +355,8 @@ const Projects = () => {
               >
                 <InputNumber
                   style={{ width: '100%' }}
-                  formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                  parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
-                />
-              </Form.Item>
-
-              <Form.Item
-                name="progress"
-                label="Progress"
-                rules={[{ required: true, message: 'Please enter project progress' }]}
-              >
-                <InputNumber
-                  style={{ width: '100%' }}
-                  min={0}
-                  max={100}
-                  formatter={(value) => `${value}%`}
-                  parser={(value) => value.replace('%', '')}
+                  formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                  parser={value => value.replace(/\$\s?|(,*)/g, '')}
                 />
               </Form.Item>
 

@@ -36,6 +36,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  basicSalary: {
+    type: Number,
+    required: true,
+    default: 0
+  },
   joinDate: {
     type: Date,
     default: Date.now

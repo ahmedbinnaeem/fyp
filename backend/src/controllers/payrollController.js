@@ -83,58 +83,64 @@ const generatePayroll = async (req, res) => {
         if (existingPayroll) {
           errors.push(`Payroll already exists for ${employee.firstName} ${employee.lastName}`);
           continue;
-    }
+        }
 
-    // Get attendance records for the month
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0);
+        // Get attendance records for the month
+        const startDate = new Date(year, month - 1, 1);
+        const endDate = new Date(year, month, 0);
 
-    const attendance = await Attendance.find({
+        const attendance = await Attendance.find({
           user: employee._id,
-      date: {
-        $gte: startDate,
-        $lte: endDate,
-      },
-    });
+          date: {
+            $gte: startDate,
+            $lte: endDate,
+          },
+        });
 
-    // Default basic salary (you might want to get this from employee settings)
-    const basicSalary = 2000; // Default value, adjust as needed
+        // Get basic salary from employee data
+        const basicSalary = employee.basicSalary;
+
+        // If no basic salary is set, skip this employee
+        if (!basicSalary) {
+          errors.push(`No basic salary set for ${employee.firstName} ${employee.lastName}`);
+          continue;
+        }
 
         // Calculate working days
-    const workingDays = attendance.filter(a => a.status === 'present').length;
-    const totalDays = endDate.getDate();
+        const workingDays = attendance.filter(a => a.status === 'present').length;
+        const totalDays = endDate.getDate();
 
-    // Calculate allowances (example: 10% of basic salary for housing)
-    const allowances = {
-      housing: basicSalary * 0.1,    // 10% housing allowance
-      transport: basicSalary * 0.05,  // 5% transport allowance
-      meal: basicSalary * 0.03,      // 3% meal allowance
-      other: 0
-    };
+        // Calculate allowances (example: 10% of basic salary for housing)
+        const allowances = {
+          housing: basicSalary * 0.1,    // 10% housing allowance
+          transport: basicSalary * 0.05,  // 5% transport allowance
+          meal: basicSalary * 0.03,      // 3% meal allowance
+          other: 0
+        };
 
-    // Calculate deductions
-    const deductions = {
-      tax: basicSalary * 0.1,        // 10% tax
-      insurance: basicSalary * 0.05,  // 5% insurance
-      other: 0
-    };
+        // Calculate deductions
+        const deductions = {
+          tax: basicSalary * 0.1,        // 10% tax
+          insurance: basicSalary * 0.05,  // 5% insurance
+          other: 0
+        };
 
-    // Calculate total allowances and deductions
-    const totalAllowances = Object.values(allowances).reduce((a, b) => a + b, 0);
-    const totalDeductions = Object.values(deductions).reduce((a, b) => a + b, 0);
+        // Calculate total allowances and deductions
+        const totalAllowances = Object.values(allowances).reduce((a, b) => a + b, 0);
+        const totalDeductions = Object.values(deductions).reduce((a, b) => a + b, 0);
 
-    // Calculate net salary
-    const netSalary = basicSalary + totalAllowances - totalDeductions;
+        // Calculate net salary
+        const netSalary = basicSalary + totalAllowances - totalDeductions;
 
-    // Create payroll record
-    const payroll = await Payroll.create({
+        // Create payroll record
+        const payroll = await Payroll.create({
           user: employee._id,
           month: Number(month),
           year: Number(year),
-      basicSalary,
-      allowances,
-      deductions,
-      netSalary,
+          basicSalary,
+          allowances,
+          deductions,
+          netSalary,
           paymentMethod: 'bank_transfer',
           status: 'pending'
         });

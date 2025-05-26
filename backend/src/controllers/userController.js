@@ -14,7 +14,7 @@ const generateToken = (id) => {
 // @access  Private/Admin
 const registerUser = async (req, res) => {
   try {
-    const { firstName, lastName, email, password, role, department, position } = req.body;
+    const { firstName, lastName, email, password, role, department, position, basicSalary } = req.body;
 
     const userExists = await User.findOne({ email });
     if (userExists) {
@@ -28,7 +28,8 @@ const registerUser = async (req, res) => {
       password,
       role,
       department,
-      position
+      position,
+      basicSalary: Number(basicSalary) || 0
     });
 
     if (user) {
@@ -40,6 +41,7 @@ const registerUser = async (req, res) => {
         role: user.role,
         position: user.position,
         department: user.department,
+        basicSalary: user.basicSalary,
         token: generateToken(user._id),
       });
     }
@@ -185,7 +187,8 @@ const updateUser = async (req, res) => {
       role,
       isActive,
       position,
-      joinDate
+      joinDate,
+      basicSalary
     } = req.body;
 
     user.firstName = firstName || user.firstName;
@@ -196,6 +199,7 @@ const updateUser = async (req, res) => {
     user.isActive = isActive !== undefined ? isActive : user.isActive;
     user.position = position || user.position;
     user.joinDate = joinDate || user.joinDate;
+    user.basicSalary = basicSalary !== undefined ? Number(basicSalary) : user.basicSalary;
 
     const updatedUser = await user.save();
     res.json(updatedUser);

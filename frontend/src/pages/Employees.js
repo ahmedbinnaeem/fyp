@@ -12,6 +12,7 @@ import {
   Alert,
   Popconfirm,
   message,
+  InputNumber,
 } from 'antd';
 import {
   EditOutlined,
@@ -57,6 +58,7 @@ const Employees = () => {
         email: employee.email,
         position: employee.position,
         department: employee.department,
+        basicSalary: employee.basicSalary,
       });
     } else {
       form.resetFields();
@@ -116,6 +118,12 @@ const Employees = () => {
       title: 'Department',
       dataIndex: 'department',
       key: 'department',
+    },
+    {
+      title: 'Basic Salary',
+      dataIndex: 'basicSalary',
+      key: 'basicSalary',
+      render: (salary) => `$${salary.toLocaleString()}`,
     },
     {
       title: 'Actions',
@@ -228,6 +236,19 @@ const Employees = () => {
               rules={[{ required: true, message: 'Please enter department' }]}
             >
               <Input />
+            </Form.Item>
+
+            <Form.Item
+              name="basicSalary"
+              label="Basic Salary"
+              rules={[{ required: true, message: 'Please enter basic salary' }]}
+            >
+              <InputNumber
+                style={{ width: '100%' }}
+                formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                min={0}
+              />
             </Form.Item>
 
             {!selectedEmployee && (
