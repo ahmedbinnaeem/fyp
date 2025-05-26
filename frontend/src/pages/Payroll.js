@@ -310,14 +310,14 @@ const Payroll = () => {
             </Card>
           </Col>
           <Col span={8}>
-            <Card>
+          <Card>
               <Statistic
                 title="Average Salary"
                 value={payrolls.length ? payrolls.reduce((sum, p) => sum + p.basicSalary, 0) / payrolls.length : 0}
                 prefix={<DollarOutlined />}
                 precision={2}
               />
-            </Card>
+          </Card>
           </Col>
         </Row>
 
@@ -345,8 +345,8 @@ const Payroll = () => {
             <Row gutter={16}>
               <Col span={12}>
                 <Form.Item
-                  name="employee"
-                  label="Employee"
+              name="employee"
+              label="Employee"
                   rules={[{ required: true, message: 'Please select an employee' }]}
                 >
                   <Select>
@@ -354,14 +354,14 @@ const Payroll = () => {
                       <Option key={emp._id} value={emp._id}>
                         {emp.firstName} {emp.lastName}
                       </Option>
-                    ))}
+              ))}
                   </Select>
                 </Form.Item>
               </Col>
               <Col span={12}>
                 <Form.Item
-                  name="basicSalary"
-                  label="Basic Salary"
+              name="basicSalary"
+              label="Basic Salary"
                   rules={[{ required: true, message: 'Please enter basic salary' }]}
                 >
                   <InputNumber
@@ -382,7 +382,7 @@ const Payroll = () => {
                     style={{ width: '100%' }}
                     formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                     parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
-                  />
+                />
                 </Form.Item>
               </Col>
               <Col span={12}>
@@ -391,7 +391,7 @@ const Payroll = () => {
                     style={{ width: '100%' }}
                     formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                     parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
-                  />
+                />
                 </Form.Item>
               </Col>
             </Row>
@@ -403,7 +403,7 @@ const Payroll = () => {
                     style={{ width: '100%' }}
                     formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                     parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
-                  />
+                />
                 </Form.Item>
               </Col>
               <Col span={12}>
@@ -412,7 +412,7 @@ const Payroll = () => {
                     style={{ width: '100%' }}
                     formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                     parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
-                  />
+                />
                 </Form.Item>
               </Col>
             </Row>
@@ -426,7 +426,7 @@ const Payroll = () => {
                     style={{ width: '100%' }}
                     formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                     parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
-                  />
+                />
                 </Form.Item>
               </Col>
               <Col span={12}>
@@ -435,7 +435,7 @@ const Payroll = () => {
                     style={{ width: '100%' }}
                     formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                     parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
-                  />
+            />
                 </Form.Item>
               </Col>
             </Row>
@@ -447,7 +447,7 @@ const Payroll = () => {
                     style={{ width: '100%' }}
                     formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                     parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
-                  />
+            />
                 </Form.Item>
               </Col>
             </Row>
@@ -456,7 +456,7 @@ const Payroll = () => {
               <Space>
                 <Button type="primary" htmlType="submit">
                   {selectedPayroll ? 'Update' : 'Create'}
-                </Button>
+          </Button>
                 <Button onClick={handleCloseModal}>Cancel</Button>
               </Space>
             </Form.Item>

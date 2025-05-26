@@ -1,5 +1,18 @@
 const mongoose = require('mongoose');
 
+const allowanceSchema = new mongoose.Schema({
+  housing: { type: Number, default: 0 },
+  transport: { type: Number, default: 0 },
+  meal: { type: Number, default: 0 },
+  other: { type: Number, default: 0 }
+}, { _id: false });
+
+const deductionSchema = new mongoose.Schema({
+  tax: { type: Number, default: 0 },
+  insurance: { type: Number, default: 0 },
+  other: { type: Number, default: 0 }
+}, { _id: false });
+
 const payrollSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
@@ -21,15 +34,14 @@ const payrollSchema = new mongoose.Schema({
     required: true
   },
   allowances: {
-    housing: { type: Number, default: 0 },
-    transport: { type: Number, default: 0 },
-    meal: { type: Number, default: 0 },
-    other: { type: Number, default: 0 }
+    type: allowanceSchema,
+    required: true,
+    default: () => ({})
   },
   deductions: {
-    tax: { type: Number, default: 0 },
-    insurance: { type: Number, default: 0 },
-    other: { type: Number, default: 0 }
+    type: deductionSchema,
+    required: true,
+    default: () => ({})
   },
   overtime: {
     hours: { type: Number, default: 0 },
@@ -53,6 +65,7 @@ const payrollSchema = new mongoose.Schema({
   paymentMethod: {
     type: String,
     enum: ['bank_transfer', 'check', 'cash'],
+    default: 'bank_transfer'
   },
   bankDetails: {
     bankName: String,
@@ -70,13 +83,13 @@ payrollSchema.index({ user: 1, year: 1, month: 1 }, { unique: true });
 // Virtual for calculating total allowances
 payrollSchema.virtual('totalAllowances').get(function() {
   const { housing, transport, meal, other } = this.allowances;
-  return housing + transport + meal + other;
+  return (housing || 0) + (transport || 0) + (meal || 0) + (other || 0);
 });
 
 // Virtual for calculating total deductions
 payrollSchema.virtual('totalDeductions').get(function() {
   const { tax, insurance, other } = this.deductions;
-  return tax + insurance + other;
+  return (tax || 0) + (insurance || 0) + (other || 0);
 });
 
 const Payroll = mongoose.model('Payroll', payrollSchema);

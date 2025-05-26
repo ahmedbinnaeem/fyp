@@ -152,8 +152,8 @@ const AdminDashboard = ({ data }) => {
         <Col xs={24} sm={12} md={8} lg={4.8}>
           <Card>
             <Statistic
-              title="Total Employees"
-              value={safeStats.totalEmployees}
+            title="Total Employees"
+            value={safeStats.totalEmployees}
               prefix={<TeamOutlined />}
               valueStyle={{ color: '#1890ff' }}
             />
@@ -162,8 +162,8 @@ const AdminDashboard = ({ data }) => {
         <Col xs={24} sm={12} md={8} lg={4.8}>
           <Card>
             <Statistic
-              title="Active Projects"
-              value={safeStats.activeProjects}
+            title="Active Projects"
+            value={safeStats.activeProjects}
               prefix={<ProjectOutlined />}
               valueStyle={{ color: '#1890ff' }}
             />
@@ -172,8 +172,8 @@ const AdminDashboard = ({ data }) => {
         <Col xs={24} sm={12} md={8} lg={4.8}>
           <Card>
             <Statistic
-              title="Pending Leaves"
-              value={safeStats.pendingLeaves}
+            title="Pending Leaves"
+            value={safeStats.pendingLeaves}
               prefix={<CalendarOutlined />}
               valueStyle={{ color: '#faad14' }}
             />
@@ -182,8 +182,8 @@ const AdminDashboard = ({ data }) => {
         <Col xs={24} sm={12} md={8} lg={4.8}>
           <Card>
             <Statistic
-              title="Today's Attendance"
-              value={safeStats.todayAttendance}
+            title="Today's Attendance"
+            value={safeStats.todayAttendance}
               prefix={<ClockCircleOutlined />}
               valueStyle={{ color: '#52c41a' }}
             />
@@ -192,7 +192,7 @@ const AdminDashboard = ({ data }) => {
         <Col xs={24} sm={12} md={8} lg={4.8}>
           <Card>
             <Statistic
-              title="Monthly Payroll"
+            title="Monthly Payroll"
               value={safeStats.monthlyPayroll}
               prefix={<DollarOutlined />}
               valueStyle={{ color: '#52c41a' }}
@@ -207,8 +207,8 @@ const AdminDashboard = ({ data }) => {
               dataSource={recentProjects || []}
               rowKey={(record) => record._id || 'temp-key'}
               pagination={false}
-              size="small"
-            />
+                          size="small"
+                        />
           </Card>
         </Col>
 
@@ -253,8 +253,8 @@ const EmployeeDashboard = ({ data }) => {
         <Col xs={24} sm={12} md={6}>
           <Card>
             <Statistic
-              title="Active Projects"
-              value={stats.activeProjects || 0}
+            title="Active Projects"
+            value={stats.activeProjects || 0}
               prefix={<ProjectOutlined />}
               valueStyle={{ color: '#1890ff' }}
             />
@@ -263,8 +263,8 @@ const EmployeeDashboard = ({ data }) => {
         <Col xs={24} sm={12} md={6}>
           <Card>
             <Statistic
-              title="Pending Leaves"
-              value={stats.pendingLeaves || 0}
+            title="Pending Leaves"
+            value={stats.pendingLeaves || 0}
               prefix={<CalendarOutlined />}
               valueStyle={{ color: '#faad14' }}
             />
@@ -273,7 +273,7 @@ const EmployeeDashboard = ({ data }) => {
         <Col xs={24} sm={12} md={6}>
           <Card>
             <Statistic
-              title="Leave Balance"
+            title="Leave Balance"
               value={stats.leaveBalance ? stats.leaveBalance.remaining : 0}
               suffix={`/ ${stats.leaveBalance ? stats.leaveBalance.total : 0}`}
               prefix={<CheckCircleOutlined />}
@@ -284,7 +284,7 @@ const EmployeeDashboard = ({ data }) => {
         <Col xs={24} sm={12} md={6}>
           <Card>
             <Statistic
-              title="Monthly Attendance"
+            title="Monthly Attendance"
               value={stats.attendance ? stats.attendance.present : 0}
               suffix={`/ ${stats.attendance ? stats.attendance.total : 0}`}
               prefix={<ClockCircleOutlined />}
