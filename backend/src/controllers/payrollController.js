@@ -177,8 +177,8 @@ const getPayrolls = async (req, res) => {
     
     // Filter by month and year if provided
     if (req.query.month && req.query.year) {
-      query.month = req.query.month;
-      query.year = req.query.year;
+      query.month = Number(req.query.month);
+      query.year = Number(req.query.year);
     }
 
     const payrolls = await Payroll.find(query)
@@ -186,25 +186,36 @@ const getPayrolls = async (req, res) => {
       .sort({ year: -1, month: -1 });
 
     // Format response to match frontend expectations
-    const formattedPayrolls = payrolls.map(payroll => ({
-      _id: payroll._id,
-      employee: {
+    const formattedPayrolls = payrolls.map(payroll => {
+      // Handle case where user might be null (deleted user)
+      const employee = payroll.user ? {
         _id: payroll.user._id,
         firstName: payroll.user.firstName,
         lastName: payroll.user.lastName,
         email: payroll.user.email,
         department: payroll.user.department
-      },
-      basicSalary: payroll.basicSalary,
-      allowances: payroll.allowances,
-      deductions: payroll.deductions,
-      netSalary: payroll.netSalary,
-      month: payroll.month,
-      year: payroll.year,
-      status: payroll.status,
-      createdAt: payroll.createdAt,
-      updatedAt: payroll.updatedAt
-    }));
+      } : {
+        _id: 'deleted',
+        firstName: 'Deleted',
+        lastName: 'User',
+        email: '',
+        department: ''
+      };
+
+      return {
+        _id: payroll._id,
+        employee,
+        basicSalary: payroll.basicSalary,
+        allowances: payroll.allowances,
+        deductions: payroll.deductions,
+        netSalary: payroll.netSalary,
+        month: payroll.month,
+        year: payroll.year,
+        status: payroll.status,
+        createdAt: payroll.createdAt,
+        updatedAt: payroll.updatedAt
+      };
+    });
 
     res.json(formattedPayrolls);
   } catch (error) {
