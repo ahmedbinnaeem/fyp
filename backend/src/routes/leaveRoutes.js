@@ -1,25 +1,29 @@
 const express = require('express');
 const router = express.Router();
 const {
-  requestLeave,
+  createLeave,
   getLeaves,
+  getMyLeaves,
   getLeaveById,
+  updateLeave,
+  deleteLeave,
   updateLeaveStatus,
-  cancelLeave,
-  getLeaveStats,
 } = require('../controllers/leaveController');
-const { protect, admin, teamLead } = require('../middleware/authMiddleware');
+const { protect, admin } = require('../middleware/authMiddleware');
+
+// Place specific routes before parameter routes
+router.get('/my-leaves', protect, getMyLeaves);
 
 router.route('/')
-  .post(protect, requestLeave)
-  .get(protect, getLeaves);
-
-router.route('/stats')
-  .get(protect, getLeaveStats);
+  .post(protect, createLeave)
+  .get(protect, admin, getLeaves);
 
 router.route('/:id')
   .get(protect, getLeaveById)
-  .put(protect, teamLead, updateLeaveStatus)
-  .delete(protect, cancelLeave);
+  .put(protect, updateLeave)
+  .delete(protect, deleteLeave);
+
+router.route('/:id/status')
+  .put(protect, admin, updateLeaveStatus);
 
 module.exports = router; 

@@ -2,22 +2,131 @@ const Payroll = require('../models/Payroll');
 const User = require('../models/User');
 const Attendance = require('../models/Attendance');
 
-// @desc    Generate payroll for a user
-// @route   POST /api/payroll/generate
+// @desc    Create manual payroll
+// @route   POST /api/payroll
 // @access  Private/Admin
-const generatePayroll = async (req, res) => {
+const createPayroll = async (req, res) => {
   try {
-    const { userId, month, year, basicSalary } = req.body;
+    const {
+      employee,
+      month,
+      year,
+      basicSalary,
+      allowances,
+      deductions,
+      overtime,
+      bonus,
+      paymentMethod,
+      bankDetails,
+      comments
+    } = req.body;
 
     // Check if payroll already exists for this month
     const existingPayroll = await Payroll.findOne({
-      user: userId,
+      user: employee,
       month,
       year,
     });
 
     if (existingPayroll) {
-      return res.status(400).json({ message: 'Payroll already generated for this month' });
+      return res.status(400).json({ message: 'Payroll already exists for this month' });
+    }
+
+    // Convert string values to numbers if needed
+    const parsedBasicSalary = Number(basicSalary);
+
+    // Process allowances
+    const processedAllowances = {
+      housing: Number(allowances.housing) || 0,
+      transport: Number(allowances.transport) || 0,
+      meal: Number(allowances.meal) || 0,
+      other: Number(allowances.other) || 0
+    };
+
+    // Process deductions
+    const processedDeductions = {
+      tax: Number(deductions.tax) || 0,
+      insurance: Number(deductions.insurance) || 0,
+      other: Number(deductions.other) || 0
+    };
+
+    // Calculate total allowances and deductions
+    const totalAllowances = Object.values(processedAllowances).reduce((a, b) => a + b, 0);
+    const totalDeductions = Object.values(processedDeductions).reduce((a, b) => a + b, 0);
+
+    // Calculate net salary
+    const netSalary = parsedBasicSalary + totalAllowances - totalDeductions;
+
+    const payroll = await Payroll.create({
+      user: employee,
+      month: Number(month),
+      year: Number(year),
+      basicSalary: parsedBasicSalary,
+      allowances: processedAllowances,
+      deductions: processedDeductions,
+      netSalary,
+      paymentMethod: paymentMethod || 'bank_transfer',
+      bankDetails,
+      comments,
+      status: 'pending'
+    });
+
+    const populatedPayroll = await Payroll.findById(payroll._id)
+      .populate('user', 'firstName lastName email department');
+
+    // Format response to match frontend expectations
+    const response = {
+      _id: populatedPayroll._id,
+      employee: {
+        _id: populatedPayroll.user._id,
+        firstName: populatedPayroll.user.firstName,
+        lastName: populatedPayroll.user.lastName,
+        email: populatedPayroll.user.email,
+        department: populatedPayroll.user.department
+      },
+      basicSalary: populatedPayroll.basicSalary,
+      allowances: populatedPayroll.allowances,
+      deductions: populatedPayroll.deductions,
+      netSalary: populatedPayroll.netSalary,
+      month: populatedPayroll.month,
+      year: populatedPayroll.year,
+      status: populatedPayroll.status,
+      createdAt: populatedPayroll.createdAt,
+      updatedAt: populatedPayroll.updatedAt
+    };
+
+    res.status(201).json(response);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// @desc    Generate payroll for all users
+// @route   POST /api/payroll/generate
+// @access  Private/Admin
+const generatePayroll = async (req, res) => {
+  try {
+    const { month, year } = req.body;
+
+    // Get all active employees
+    const employees = await User.find({ isActive: true });
+
+    const results = [];
+    const errors = [];
+
+    // Process each employee
+    for (const employee of employees) {
+      try {
+        // Check if payroll already exists for this employee in this month
+        const existingPayroll = await Payroll.findOne({
+          user: employee._id,
+          month,
+          year,
+        });
+
+        if (existingPayroll) {
+          errors.push(`Payroll already exists for ${employee.firstName} ${employee.lastName}`);
+          continue;
     }
 
     // Get attendance records for the month
@@ -25,45 +134,75 @@ const generatePayroll = async (req, res) => {
     const endDate = new Date(year, month, 0);
 
     const attendance = await Attendance.find({
-      user: userId,
+          user: employee._id,
       date: {
         $gte: startDate,
         $lte: endDate,
       },
     });
 
-    // Calculate working days and leaves
+        // Default basic salary (you might want to get this from employee settings)
+        const basicSalary = 2000; // Default value, adjust as needed
+
+        // Calculate working days
     const workingDays = attendance.filter(a => a.status === 'present').length;
     const totalDays = endDate.getDate();
 
-    // Calculate deductions based on attendance
-    const perDaySalary = basicSalary / totalDays;
-    const deductions = (totalDays - workingDays) * perDaySalary;
+        // Calculate allowances (example: 10% of basic salary for housing)
+        const allowances = {
+          housing: basicSalary * 0.1,    // 10% housing allowance
+          transport: basicSalary * 0.05,  // 5% transport allowance
+          meal: basicSalary * 0.03,      // 3% meal allowance
+          other: 0
+        };
 
-    // Calculate allowances (example: 10% of basic salary)
-    const allowances = basicSalary * 0.1;
+        // Calculate deductions
+        const deductions = {
+          tax: basicSalary * 0.1,        // 10% tax
+          insurance: basicSalary * 0.05,  // 5% insurance
+          other: 0
+        };
 
-    // Calculate gross and net salary
-    const grossSalary = basicSalary + allowances;
-    const netSalary = grossSalary - deductions;
+        // Calculate total allowances and deductions
+        const totalAllowances = Object.values(allowances).reduce((a, b) => a + b, 0);
+        const totalDeductions = Object.values(deductions).reduce((a, b) => a + b, 0);
 
+        // Calculate net salary
+        const netSalary = basicSalary + totalAllowances - totalDeductions;
+
+        // Create payroll record
     const payroll = await Payroll.create({
-      user: userId,
-      month,
-      year,
+          user: employee._id,
+          month: Number(month),
+          year: Number(year),
       basicSalary,
       allowances,
       deductions,
-      grossSalary,
       netSalary,
-      workingDays,
-      totalDays,
-      generatedBy: req.user._id,
-    });
+          paymentMethod: 'bank_transfer',
+          status: 'pending'
+        });
 
-    res.status(201).json(payroll);
+        const populatedPayroll = await Payroll.findById(payroll._id)
+          .populate('user', 'firstName lastName email department');
+
+        results.push(populatedPayroll);
+      } catch (error) {
+        errors.push(`Failed to generate payroll for ${employee.firstName} ${employee.lastName}: ${error.message}`);
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      results,
+      errors,
+      message: `Generated ${results.length} payrolls with ${errors.length} errors`
+    });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    res.status(400).json({ 
+      success: false,
+      message: error.message 
+    });
   }
 };
 
@@ -82,10 +221,30 @@ const getPayrolls = async (req, res) => {
 
     const payrolls = await Payroll.find(query)
       .populate('user', 'firstName lastName email department')
-      .populate('generatedBy', 'firstName lastName')
       .sort({ year: -1, month: -1 });
 
-    res.json(payrolls);
+    // Format response to match frontend expectations
+    const formattedPayrolls = payrolls.map(payroll => ({
+      _id: payroll._id,
+      employee: {
+        _id: payroll.user._id,
+        firstName: payroll.user.firstName,
+        lastName: payroll.user.lastName,
+        email: payroll.user.email,
+        department: payroll.user.department
+      },
+      basicSalary: payroll.basicSalary,
+      allowances: payroll.allowances,
+      deductions: payroll.deductions,
+      netSalary: payroll.netSalary,
+      month: payroll.month,
+      year: payroll.year,
+      status: payroll.status,
+      createdAt: payroll.createdAt,
+      updatedAt: payroll.updatedAt
+    }));
+
+    res.json(formattedPayrolls);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -97,8 +256,7 @@ const getPayrolls = async (req, res) => {
 const getPayrollById = async (req, res) => {
   try {
     const payroll = await Payroll.findById(req.params.id)
-      .populate('user', 'firstName lastName email department')
-      .populate('generatedBy', 'firstName lastName');
+      .populate('user', 'firstName lastName email department');
 
     if (!payroll) {
       return res.status(404).json({ message: 'Payroll not found' });
@@ -198,6 +356,7 @@ const getPayrollStats = async (req, res) => {
 };
 
 module.exports = {
+  createPayroll,
   generatePayroll,
   getPayrolls,
   getPayrollById,

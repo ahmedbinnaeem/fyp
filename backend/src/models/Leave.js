@@ -1,38 +1,45 @@
 const mongoose = require('mongoose');
 
-const leaveSchema = new mongoose.Schema({
+const leaveSchema = new mongoose.Schema(
+  {
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true
+      required: true,
   },
   leaveType: {
     type: String,
-    enum: ['annual', 'sick', 'personal', 'maternity', 'paternity', 'unpaid'],
-    required: true
+      enum: ['Annual', 'Sick', 'Personal', 'Maternity', 'Paternity', 'Unpaid'],
+      required: true,
   },
   startDate: {
     type: Date,
-    required: true
+      required: true,
   },
   endDate: {
     type: Date,
-    required: true
+      required: true,
+    },
+    duration: {
+      type: Number,
+      required: true,
   },
   reason: {
     type: String,
-    required: true
+      required: true,
   },
   status: {
     type: String,
-    enum: ['pending', 'approved', 'rejected'],
-    default: 'pending'
+      enum: ['Pending', 'Approved', 'Rejected'],
+      default: 'Pending',
   },
-  approvedBy: {
+    actionBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+      ref: 'User',
+    },
+    actionAt: {
+      type: Date,
   },
-  approvalDate: Date,
   attachments: [{
     name: String,
     url: String,
@@ -52,9 +59,11 @@ const leaveSchema = new mongoose.Schema({
       default: Date.now
     }
   }]
-}, {
-  timestamps: true
-});
+  },
+  {
+    timestamps: true,
+  }
+);
 
 // Virtual for calculating number of days
 leaveSchema.virtual('numberOfDays').get(function() {

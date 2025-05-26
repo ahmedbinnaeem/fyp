@@ -1,71 +1,56 @@
 const mongoose = require('mongoose');
 
-const projectSchema = new mongoose.Schema({
+const projectSchema = new mongoose.Schema(
+  {
   name: {
     type: String,
     required: true,
-    trim: true
   },
   description: {
     type: String,
-    required: true
+      required: true,
   },
   startDate: {
     type: Date,
-    required: true
+      required: true,
   },
   endDate: {
     type: Date,
-    required: true
+      required: true,
   },
   status: {
     type: String,
-    enum: ['planning', 'in_progress', 'completed', 'on_hold'],
-    default: 'planning'
+    enum: ['Not Started', 'In Progress', 'On Hold', 'Completed'],
+      default: 'Not Started',
   },
+    team: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    }],
   teamLead: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  team: [{
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    },
-    role: {
-      type: String,
-      required: true
-    },
-    assignedAt: {
-      type: Date,
-      default: Date.now
-    }
-  }],
   budget: {
     type: Number,
-    required: true
+      default: 0,
+    },
+    progress: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
   },
-  technologies: [{
-    type: String
-  }],
-  priority: {
-    type: String,
-    enum: ['low', 'medium', 'high'],
-    default: 'medium'
-  },
-  documents: [{
-    name: String,
-    url: String,
-    uploadedAt: {
-      type: Date,
-      default: Date.now
-    }
-  }]
-}, {
-  timestamps: true
-});
+  {
+    timestamps: true,
+  }
+);
 
-const Project = mongoose.model('Project', projectSchema);
-
-module.exports = Project; 
+module.exports = mongoose.model('Project', projectSchema); 

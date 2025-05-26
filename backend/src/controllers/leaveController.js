@@ -1,62 +1,64 @@
 const Leave = require('../models/Leave');
 
-// @desc    Request a leave
+// @desc    Get all leaves
+// @route   GET /api/leaves
+// @access  Private/Admin
+const getLeaves = async (req, res) => {
+  try {
+    const leaves = await Leave.find()
+      .populate('user', 'firstName lastName email department')
+      .sort({ createdAt: -1 });
+    res.json(leaves);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get user's leaves
+// @route   GET /api/leaves/my-leaves
+// @access  Private
+const getMyLeaves = async (req, res) => {
+  try {
+    const leaves = await Leave.find({ user: req.user._id })
+      .populate('user', 'firstName lastName email department')
+      .sort({ createdAt: -1 });
+    res.json(leaves);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Create new leave request
 // @route   POST /api/leaves
 // @access  Private
-const requestLeave = async (req, res) => {
+const createLeave = async (req, res) => {
   try {
-    const { startDate, endDate, type, reason } = req.body;
+    const { leaveType, startDate, endDate, reason } = req.body;
 
-    // Check for overlapping leaves
-    const overlappingLeave = await Leave.findOne({
-      user: req.user._id,
-      status: { $ne: 'rejected' },
-      $or: [
-        {
-          startDate: { $lte: new Date(endDate) },
-          endDate: { $gte: new Date(startDate) },
-        },
-      ],
-    });
-
-    if (overlappingLeave) {
-      return res.status(400).json({ message: 'You already have a leave request for these dates' });
+    // Calculate duration (excluding weekends)
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    let duration = 0;
+    for (let d = start; d <= end; d.setDate(d.getDate() + 1)) {
+      if (d.getDay() !== 0 && d.getDay() !== 6) {
+        duration++;
+      }
     }
 
     const leave = await Leave.create({
       user: req.user._id,
+      leaveType,
       startDate,
       endDate,
-      type,
+      duration,
       reason,
-      status: 'pending',
+      status: 'Pending'
     });
 
-    res.status(201).json(leave);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-};
+    const populatedLeave = await Leave.findById(leave._id)
+      .populate('user', 'firstName lastName email department');
 
-// @desc    Get all leaves (admin) or user's leaves
-// @route   GET /api/leaves
-// @access  Private
-const getLeaves = async (req, res) => {
-  try {
-    const query = req.user.role === 'admin' ? {} : { user: req.user._id };
-    
-    if (req.user.role === 'team_lead') {
-      // Team leads can see their team members' leaves
-      const teamMembers = await User.find({ 'department': req.user.department });
-      const teamMemberIds = teamMembers.map(member => member._id);
-      query.$or = [{ user: req.user._id }, { user: { $in: teamMemberIds } }];
-    }
-
-    const leaves = await Leave.find(query)
-      .populate('user', 'firstName lastName email department')
-      .sort({ createdAt: -1 });
-
-    res.json(leaves);
+    res.status(201).json(populatedLeave);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -77,7 +79,6 @@ const getLeaveById = async (req, res) => {
     // Check if user has permission to view this leave
     if (
       req.user.role !== 'admin' &&
-      req.user.role !== 'team_lead' &&
       leave.user._id.toString() !== req.user._id.toString()
     ) {
       return res.status(401).json({ message: 'Not authorized' });
@@ -85,34 +86,46 @@ const getLeaveById = async (req, res) => {
 
     res.json(leave);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// @desc    Update leave status
+// @desc    Update leave
 // @route   PUT /api/leaves/:id
-// @access  Private/Admin/TeamLead
-const updateLeaveStatus = async (req, res) => {
+// @access  Private
+const updateLeave = async (req, res) => {
   try {
-    const { status, comment } = req.body;
     const leave = await Leave.findById(req.params.id);
 
     if (!leave) {
       return res.status(404).json({ message: 'Leave not found' });
     }
 
-    // Only admin or team lead of same department can update status
+    // Only allow updating own leaves that are pending
     if (
-      req.user.role !== 'admin' &&
-      (req.user.role !== 'team_lead' || req.user.department !== leave.user.department)
+      leave.user.toString() !== req.user._id.toString() ||
+      leave.status !== 'Pending'
     ) {
       return res.status(401).json({ message: 'Not authorized' });
     }
 
-    leave.status = status;
-    leave.comment = comment;
-    leave.reviewedBy = req.user._id;
-    leave.reviewedAt = new Date();
+    const { leaveType, startDate, endDate, reason } = req.body;
+
+    // Calculate duration (excluding weekends)
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    let duration = 0;
+    for (let d = start; d <= end; d.setDate(d.getDate() + 1)) {
+      if (d.getDay() !== 0 && d.getDay() !== 6) {
+        duration++;
+      }
+    }
+
+    leave.leaveType = leaveType;
+    leave.startDate = startDate;
+    leave.endDate = endDate;
+    leave.duration = duration;
+    leave.reason = reason;
 
     const updatedLeave = await leave.save();
     res.json(updatedLeave);
@@ -121,10 +134,10 @@ const updateLeaveStatus = async (req, res) => {
   }
 };
 
-// @desc    Cancel leave request
+// @desc    Delete leave
 // @route   DELETE /api/leaves/:id
 // @access  Private
-const cancelLeave = async (req, res) => {
+const deleteLeave = async (req, res) => {
   try {
     const leave = await Leave.findById(req.params.id);
 
@@ -132,58 +145,59 @@ const cancelLeave = async (req, res) => {
       return res.status(404).json({ message: 'Leave not found' });
     }
 
-    // Only the user who created the leave request can cancel it
-    if (leave.user.toString() !== req.user._id.toString()) {
+    // Only allow deleting own leaves that are pending
+    if (
+      leave.user.toString() !== req.user._id.toString() ||
+      leave.status !== 'Pending'
+    ) {
       return res.status(401).json({ message: 'Not authorized' });
     }
 
-    // Can only cancel pending leaves
-    if (leave.status !== 'pending') {
-      return res.status(400).json({ message: 'Cannot cancel approved/rejected leave' });
-    }
-
     await leave.remove();
-    res.json({ message: 'Leave request cancelled' });
+    res.json({ message: 'Leave removed' });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
-// @desc    Get leave statistics
-// @route   GET /api/leaves/stats
-// @access  Private
-const getLeaveStats = async (req, res) => {
+// @desc    Update leave status (approve/reject)
+// @route   PUT /api/leaves/:id/status
+// @access  Private/Admin
+const updateLeaveStatus = async (req, res) => {
   try {
-    const query = req.user.role === 'admin' ? {} : { user: req.user._id };
-    
-    const stats = await Leave.aggregate([
-      { $match: query },
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 },
-        },
-      },
-    ]);
+    const { status } = req.body;
 
-    const formattedStats = {
-      pending: 0,
-      approved: 0,
-      rejected: 0,
-      ...Object.fromEntries(stats.map(({ _id, count }) => [_id, count])),
-    };
+    if (!['Approved', 'Rejected'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
 
-    res.json(formattedStats);
+    const leave = await Leave.findById(req.params.id);
+
+    if (!leave) {
+      return res.status(404).json({ message: 'Leave not found' });
+    }
+
+    if (leave.status !== 'Pending') {
+      return res.status(400).json({ message: 'Leave is not pending' });
+    }
+
+    leave.status = status;
+    leave.actionBy = req.user._id;
+    leave.actionAt = Date.now();
+
+    const updatedLeave = await leave.save();
+    res.json(updatedLeave);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
 };
 
 module.exports = {
-  requestLeave,
   getLeaves,
+  getMyLeaves,
+  createLeave,
   getLeaveById,
+  updateLeave,
+  deleteLeave,
   updateLeaveStatus,
-  cancelLeave,
-  getLeaveStats,
 }; 

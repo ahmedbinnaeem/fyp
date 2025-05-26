@@ -53,7 +53,6 @@ const payrollSchema = new mongoose.Schema({
   paymentMethod: {
     type: String,
     enum: ['bank_transfer', 'check', 'cash'],
-    required: true
   },
   bankDetails: {
     bankName: String,

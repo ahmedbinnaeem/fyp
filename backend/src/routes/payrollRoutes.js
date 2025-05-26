@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const {
+  createPayroll,
   generatePayroll,
   getPayrolls,
   getPayrollById,
@@ -11,6 +12,7 @@ const {
 const { protect, admin } = require('../middleware/authMiddleware');
 
 router.route('/')
+  .post(protect, createPayroll)
   .get(protect, getPayrolls);
 
 router.route('/generate')

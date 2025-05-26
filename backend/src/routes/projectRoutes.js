@@ -7,8 +7,12 @@ const {
   updateProject,
   deleteProject,
   addTeamMember,
+  getMyProjects,
 } = require('../controllers/projectController');
 const { protect, admin, teamLead } = require('../middleware/authMiddleware');
+
+// Place specific routes before parameter routes
+router.get('/my-projects', protect, getMyProjects);
 
 router.route('/')
   .post(protect, teamLead, createProject)

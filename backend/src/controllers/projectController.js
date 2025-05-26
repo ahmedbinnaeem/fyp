@@ -8,10 +8,15 @@ const createProject = async (req, res) => {
   try {
     const project = await Project.create({
       ...req.body,
-      teamLead: req.user._id,
+      createdBy: req.user._id,
     });
 
-    res.status(201).json(project);
+    const populatedProject = await Project.findById(project._id)
+      .populate('team', 'firstName lastName email department')
+      .populate('teamLead', 'firstName lastName email department')
+      .populate('createdBy', 'firstName lastName');
+
+    res.status(201).json(populatedProject);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -19,29 +24,38 @@ const createProject = async (req, res) => {
 
 // @desc    Get all projects
 // @route   GET /api/projects
-// @access  Private
+// @access  Private/Admin
 const getProjects = async (req, res) => {
   try {
-    let query = {};
-    
-    // If not admin, only show projects where user is team lead or team member
-    if (req.user.role !== 'admin') {
-      query = {
-        $or: [
-          { teamLead: req.user._id },
-          { 'team.user': req.user._id }
-        ]
-      };
-    }
-
-    const projects = await Project.find(query)
-      .populate('teamLead', 'firstName lastName email')
-      .populate('team.user', 'firstName lastName email')
+    const projects = await Project.find()
+      .populate('team', 'firstName lastName email department')
+      .populate('teamLead', 'firstName lastName email department')
+      .populate('createdBy', 'firstName lastName')
       .sort({ createdAt: -1 });
-
     res.json(projects);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get user's projects (where they are team member or team lead)
+// @route   GET /api/projects/my-projects
+// @access  Private
+const getMyProjects = async (req, res) => {
+  try {
+    const projects = await Project.find({
+        $or: [
+        { team: req.user._id },
+        { teamLead: req.user._id }
+        ]
+    })
+      .populate('team', 'firstName lastName email department')
+      .populate('teamLead', 'firstName lastName email department')
+      .populate('createdBy', 'firstName lastName')
+      .sort({ createdAt: -1 });
+    res.json(projects);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -51,25 +65,17 @@ const getProjects = async (req, res) => {
 const getProjectById = async (req, res) => {
   try {
     const project = await Project.findById(req.params.id)
-      .populate('teamLead', 'firstName lastName email')
-      .populate('team.user', 'firstName lastName email');
+      .populate('team', 'firstName lastName email department')
+      .populate('teamLead', 'firstName lastName email department')
+      .populate('createdBy', 'firstName lastName');
 
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    // Check if user has permission to view this project
-    if (
-      req.user.role !== 'admin' &&
-      project.teamLead._id.toString() !== req.user._id.toString() &&
-      !project.team.some(member => member.user._id.toString() === req.user._id.toString())
-    ) {
-      return res.status(401).json({ message: 'Not authorized' });
-    }
-
     res.json(project);
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -92,8 +98,14 @@ const updateProject = async (req, res) => {
       return res.status(401).json({ message: 'Not authorized' });
     }
 
-    Object.assign(project, req.body);
-    const updatedProject = await project.save();
+    const updatedProject = await Project.findByIdAndUpdate(
+      req.params.id,
+      { ...req.body },
+      { new: true }
+    )
+      .populate('team', 'firstName lastName email department')
+      .populate('teamLead', 'firstName lastName email department')
+      .populate('createdBy', 'firstName lastName');
 
     res.json(updatedProject);
   } catch (error) {
@@ -115,7 +127,7 @@ const deleteProject = async (req, res) => {
     await project.remove();
     res.json({ message: 'Project removed' });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -124,7 +136,7 @@ const deleteProject = async (req, res) => {
 // @access  Private/TeamLead/Admin
 const addTeamMember = async (req, res) => {
   try {
-    const { userId, role } = req.body;
+    const { userId } = req.body;
     const project = await Project.findById(req.params.id);
 
     if (!project) {
@@ -140,19 +152,19 @@ const addTeamMember = async (req, res) => {
     }
 
     // Check if user is already in team
-    if (project.team.some(member => member.user.toString() === userId)) {
+    if (project.team.includes(userId)) {
       return res.status(400).json({ message: 'User is already in the team' });
     }
 
-    // Add new team member
-    project.team.push({
-      user: userId,
-      role,
-      assignedAt: new Date(),
-    });
-
+    project.team.push(userId);
     const updatedProject = await project.save();
-    res.json(updatedProject);
+    
+    const populatedProject = await updatedProject
+      .populate('team', 'firstName lastName email department')
+      .populate('teamLead', 'firstName lastName email department')
+      .populate('createdBy', 'firstName lastName');
+
+    res.json(populatedProject);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -161,6 +173,7 @@ const addTeamMember = async (req, res) => {
 module.exports = {
   createProject,
   getProjects,
+  getMyProjects,
   getProjectById,
   updateProject,
   deleteProject,

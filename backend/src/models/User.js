@@ -32,6 +32,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  position: {
+    type: String,
+    default: ''
+  },
   joinDate: {
     type: Date,
     default: Date.now
