@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -18,11 +18,13 @@ import {
   TextField,
   CircularProgress,
   MenuItem,
-  LinearProgress,
+  Chip,
+  Alert,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import { useSelector } from 'react-redux';
 import api from '../utils/axios';
 
 const statusOptions = ['Not Started', 'In Progress', 'On Hold', 'Completed'];
@@ -41,36 +43,44 @@ const Projects = () => {
     endDate: '',
     status: 'Not Started',
     team: [],
+    teamLead: '',
     budget: '',
     progress: 0,
   });
+  const { user } = useSelector((state) => state.auth);
 
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get('/projects');
-      setProjects(response.data);
       setError(null);
+      // If user is admin, fetch all projects, else fetch user's projects
+      const endpoint = user?.role === 'admin' ? '/projects' : '/projects/my-projects';
+      const response = await api.get(endpoint);
+      setProjects(response.data);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to fetch projects');
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.role]);
 
-  const fetchEmployees = async () => {
-    try {
-      const response = await api.get('/users');
-      setEmployees(response.data);
-    } catch (err) {
-      console.error('Failed to fetch employees:', err);
+  const fetchEmployees = useCallback(async () => {
+    if (user?.role === 'admin') {
+      try {
+        const response = await api.get('/users');
+        setEmployees(response.data);
+      } catch (err) {
+        console.error('Failed to fetch employees:', err);
+      }
     }
-  };
+  }, [user?.role]);
 
   useEffect(() => {
     fetchProjects();
-    fetchEmployees();
-  }, []);
+    if (user?.role === 'admin') {
+      fetchEmployees();
+    }
+  }, [user, fetchProjects, fetchEmployees]);
 
   const handleOpenDialog = (project = null) => {
     if (project) {
@@ -88,6 +98,7 @@ const Projects = () => {
         endDate: '',
         status: 'Not Started',
         team: [],
+        teamLead: '',
         budget: '',
         progress: 0,
       });
@@ -106,6 +117,7 @@ const Projects = () => {
       endDate: '',
       status: 'Not Started',
       team: [],
+      teamLead: '',
       budget: '',
       progress: 0,
     });
@@ -146,7 +158,7 @@ const Projects = () => {
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
         <CircularProgress />
       </Box>
     );
@@ -154,8 +166,8 @@ const Projects = () => {
 
   if (error) {
     return (
-      <Box>
-        <Typography color="error">{error}</Typography>
+      <Box m={2}>
+        <Alert severity="error">{error}</Alert>
       </Box>
     );
   }
@@ -163,171 +175,198 @@ const Projects = () => {
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">Projects Management</Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-        >
-          Add Project
-        </Button>
+        <Typography variant="h4">
+          {user?.role === 'admin' ? 'All Projects' : 'My Projects'}
+        </Typography>
+        {user?.role === 'admin' && (
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog()}
+          >
+            Add Project
+          </Button>
+        )}
       </Box>
 
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Name</TableCell>
+              <TableCell>Project Name</TableCell>
+              <TableCell>Description</TableCell>
+              <TableCell>Start Date</TableCell>
+              <TableCell>End Date</TableCell>
               <TableCell>Status</TableCell>
-              <TableCell>Progress</TableCell>
-              <TableCell>Team Size</TableCell>
-              <TableCell>Timeline</TableCell>
-              <TableCell>Budget</TableCell>
-              <TableCell align="right">Actions</TableCell>
+              <TableCell>Team Members</TableCell>
+              {user?.role === 'admin' && <TableCell align="right">Actions</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
             {projects.map((project) => (
               <TableRow key={project._id}>
                 <TableCell>{project.name}</TableCell>
-                <TableCell>{project.status}</TableCell>
+                <TableCell>{project.description}</TableCell>
+                <TableCell>{new Date(project.startDate).toLocaleDateString()}</TableCell>
+                <TableCell>{new Date(project.endDate).toLocaleDateString()}</TableCell>
                 <TableCell>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    <Box sx={{ width: '100%', mr: 1 }}>
-                      <LinearProgress variant="determinate" value={project.progress} />
-                    </Box>
-                    <Box sx={{ minWidth: 35 }}>
-                      <Typography variant="body2" color="text.secondary">{`${Math.round(
-                        project.progress
-                      )}%`}</Typography>
-                    </Box>
-                  </Box>
+                  <Chip
+                    label={project.status}
+                    color={
+                      project.status === 'Completed'
+                        ? 'success'
+                        : project.status === 'In Progress'
+                        ? 'primary'
+                        : project.status === 'On Hold'
+                        ? 'warning'
+                        : 'default'
+                    }
+                    size="small"
+                  />
                 </TableCell>
-                <TableCell>{project.team.length}</TableCell>
                 <TableCell>
-                  {new Date(project.startDate).toLocaleDateString()} -{' '}
-                  {new Date(project.endDate).toLocaleDateString()}
+                  {project.team
+                    .map((member) => `${member.firstName} ${member.lastName}`)
+                    .join(', ')}
                 </TableCell>
-                <TableCell>${project.budget}</TableCell>
-                <TableCell align="right">
-                  <IconButton onClick={() => handleOpenDialog(project)} color="primary">
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton onClick={() => handleDelete(project._id)} color="error">
-                    <DeleteIcon />
-                  </IconButton>
-                </TableCell>
+                {user?.role === 'admin' && (
+                  <TableCell align="right">
+                    <IconButton onClick={() => handleOpenDialog(project)} color="primary">
+                      <EditIcon />
+                    </IconButton>
+                    <IconButton onClick={() => handleDelete(project._id)} color="error">
+                      <DeleteIcon />
+                    </IconButton>
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </TableContainer>
 
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {selectedProject ? 'Edit Project' : 'Add New Project'}
-        </DialogTitle>
-        <DialogContent>
-          <Box display="flex" flexDirection="column" gap={2} mt={2}>
-            <TextField
-              name="name"
-              label="Project Name"
-              value={formData.name}
-              onChange={handleInputChange}
-              fullWidth
-            />
-            <TextField
-              name="description"
-              label="Description"
-              value={formData.description}
-              onChange={handleInputChange}
-              multiline
-              rows={3}
-              fullWidth
-            />
-            <TextField
-              name="startDate"
-              label="Start Date"
-              type="date"
-              value={formData.startDate}
-              onChange={handleInputChange}
-              fullWidth
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              name="endDate"
-              label="End Date"
-              type="date"
-              value={formData.endDate}
-              onChange={handleInputChange}
-              fullWidth
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              name="status"
-              label="Status"
-              select
-              value={formData.status}
-              onChange={handleInputChange}
-              fullWidth
-            >
-              {statusOptions.map((option) => (
-                <MenuItem key={option} value={option}>
-                  {option}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              name="team"
-              label="Team Members"
-              select
-              value={formData.team}
-              onChange={handleInputChange}
-              fullWidth
-              SelectProps={{ multiple: true }}
-            >
-              {employees.map((employee) => (
-                <MenuItem key={employee._id} value={employee._id}>
-                  {employee.firstName} {employee.lastName}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              name="budget"
-              label="Budget"
-              type="number"
-              value={formData.budget}
-              onChange={handleInputChange}
-              fullWidth
-              InputProps={{
-                startAdornment: '$',
-              }}
-            />
-            <TextField
-              name="progress"
-              label="Progress"
-              type="number"
-              value={formData.progress}
-              onChange={handleInputChange}
-              fullWidth
-              InputProps={{
-                endAdornment: '%',
-                inputProps: {
-                  min: 0,
-                  max: 100,
-                },
-              }}
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained" color="primary">
-            {selectedProject ? 'Update' : 'Add'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {user?.role === 'admin' && (
+        <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
+          <DialogTitle>
+            {selectedProject ? 'Edit Project' : 'Add New Project'}
+          </DialogTitle>
+          <DialogContent>
+            <Box display="flex" flexDirection="column" gap={2} mt={2}>
+              <TextField
+                name="name"
+                label="Project Name"
+                value={formData.name}
+                onChange={handleInputChange}
+                fullWidth
+              />
+              <TextField
+                name="description"
+                label="Description"
+                value={formData.description}
+                onChange={handleInputChange}
+                multiline
+                rows={3}
+                fullWidth
+              />
+              <TextField
+                name="startDate"
+                label="Start Date"
+                type="date"
+                value={formData.startDate}
+                onChange={handleInputChange}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                name="endDate"
+                label="End Date"
+                type="date"
+                value={formData.endDate}
+                onChange={handleInputChange}
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+              />
+              <TextField
+                name="status"
+                label="Status"
+                select
+                value={formData.status}
+                onChange={handleInputChange}
+                fullWidth
+              >
+                {statusOptions.map((option) => (
+                  <MenuItem key={option} value={option}>
+                    {option}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                name="team"
+                label="Team Members"
+                select
+                value={formData.team}
+                onChange={handleInputChange}
+                fullWidth
+                SelectProps={{ multiple: true }}
+              >
+                {employees.map((employee) => (
+                  <MenuItem key={employee._id} value={employee._id}>
+                    {employee.firstName} {employee.lastName}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                name="teamLead"
+                label="Team Lead"
+                select
+                value={formData.teamLead}
+                onChange={handleInputChange}
+                fullWidth
+                required
+              >
+                {employees.map((employee) => (
+                  <MenuItem key={employee._id} value={employee._id}>
+                    {employee.firstName} {employee.lastName}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                name="budget"
+                label="Budget"
+                type="number"
+                value={formData.budget}
+                onChange={handleInputChange}
+                fullWidth
+                InputProps={{
+                  startAdornment: '$',
+                }}
+              />
+              <TextField
+                name="progress"
+                label="Progress"
+                type="number"
+                value={formData.progress}
+                onChange={handleInputChange}
+                fullWidth
+                InputProps={{
+                  endAdornment: '%',
+                  inputProps: {
+                    min: 0,
+                    max: 100,
+                  },
+                }}
+              />
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseDialog}>Cancel</Button>
+            <Button onClick={handleSubmit} variant="contained" color="primary">
+              {selectedProject ? 'Update' : 'Add'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
     </Box>
   );
 };

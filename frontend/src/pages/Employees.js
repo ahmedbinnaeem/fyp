@@ -223,13 +223,13 @@ const Employees = () => {
               onChange={handleInputChange}
               fullWidth
             />
-            <TextField
+            {!selectedEmployee && <TextField
               name="password"
               label="Password"
               value={formData.password}
               onChange={handleInputChange}
               fullWidth
-            />
+            />}
           </Box>
         </DialogContent>
         <DialogActions>

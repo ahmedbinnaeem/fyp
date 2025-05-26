@@ -21,6 +21,7 @@ import {
   Grid,
   Card,
   CardContent,
+  Divider,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DownloadIcon from '@mui/icons-material/Download';
@@ -52,8 +53,17 @@ const Payroll = () => {
   const [formData, setFormData] = useState({
     employee: '',
     basicSalary: '',
-    allowances: '',
-    deductions: '',
+    allowances: {
+      housing: '',
+      transport: '',
+      meal: '',
+      other: ''
+    },
+    deductions: {
+      tax: '',
+      insurance: '',
+      other: ''
+    },
     month: '',
     year: '',
   });
@@ -92,8 +102,17 @@ const Payroll = () => {
       setFormData({
         employee: payroll.employee._id,
         basicSalary: payroll.basicSalary,
-        allowances: payroll.allowances,
-        deductions: payroll.deductions,
+        allowances: {
+          housing: payroll.allowances.housing || '',
+          transport: payroll.allowances.transport || '',
+          meal: payroll.allowances.meal || '',
+          other: payroll.allowances.other || ''
+        },
+        deductions: {
+          tax: payroll.deductions.tax || '',
+          insurance: payroll.deductions.insurance || '',
+          other: payroll.deductions.other || ''
+        },
         month: payroll.month,
         year: payroll.year,
       });
@@ -102,8 +121,17 @@ const Payroll = () => {
       setFormData({
         employee: '',
         basicSalary: '',
-        allowances: '',
-        deductions: '',
+        allowances: {
+          housing: '',
+          transport: '',
+          meal: '',
+          other: ''
+        },
+        deductions: {
+          tax: '',
+          insurance: '',
+          other: ''
+        },
         month: selectedMonth.getMonth() + 1,
         year: selectedMonth.getFullYear(),
       });
@@ -118,8 +146,17 @@ const Payroll = () => {
     setFormData({
       employee: '',
       basicSalary: '',
-      allowances: '',
-      deductions: '',
+      allowances: {
+        housing: '',
+        transport: '',
+        meal: '',
+        other: ''
+      },
+      deductions: {
+        tax: '',
+        insurance: '',
+        other: ''
+      },
       month: '',
       year: '',
     });
@@ -127,18 +164,41 @@ const Payroll = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    if (name.includes('.')) {
+      const [category, field] = name.split('.');
+      setFormData((prev) => ({
+        ...prev,
+        [category]: {
+          ...prev[category],
+          [field]: value
+        }
+      }));
+    } else {
     setFormData((prev) => ({
       ...prev,
       [name]: value,
     }));
+    }
   };
 
   const handleSubmit = async () => {
     try {
+      const payload = {
+        ...formData,
+        allowances: Object.entries(formData.allowances).reduce((acc, [key, value]) => {
+          acc[key] = Number(value) || 0;
+          return acc;
+        }, {}),
+        deductions: Object.entries(formData.deductions).reduce((acc, [key, value]) => {
+          acc[key] = Number(value) || 0;
+          return acc;
+        }, {})
+      };
+
       if (selectedPayroll) {
-        await api.put(`/payroll/${selectedPayroll._id}`, formData);
+        await api.put(`/payroll/${selectedPayroll._id}`, payload);
       } else {
-        await api.post('/payroll', formData);
+        await api.post('/payroll', payload);
       }
       handleCloseDialog();
       fetchPayrolls();
@@ -176,6 +236,14 @@ const Payroll = () => {
     }
   };
 
+  const calculateTotalAllowances = (allowances) => {
+    return Object.values(allowances).reduce((sum, value) => sum + (Number(value) || 0), 0);
+  };
+
+  const calculateTotalDeductions = (deductions) => {
+    return Object.values(deductions).reduce((sum, value) => sum + (Number(value) || 0), 0);
+  };
+
   if (loading) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
@@ -194,7 +262,7 @@ const Payroll = () => {
 
   const totalPayroll = payrolls.reduce(
     (sum, payroll) =>
-      sum + (payroll.basicSalary + payroll.allowances - payroll.deductions),
+      sum + (payroll.basicSalary + calculateTotalAllowances(payroll.allowances) - calculateTotalDeductions(payroll.deductions)),
     0
   );
 
@@ -256,8 +324,8 @@ const Payroll = () => {
             <TableRow>
               <TableCell>Employee</TableCell>
               <TableCell>Basic Salary</TableCell>
-              <TableCell>Allowances</TableCell>
-              <TableCell>Deductions</TableCell>
+              <TableCell>Total Allowances</TableCell>
+              <TableCell>Total Deductions</TableCell>
               <TableCell>Net Salary</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
@@ -269,14 +337,14 @@ const Payroll = () => {
                   {payroll.employee.firstName} {payroll.employee.lastName}
                 </TableCell>
                 <TableCell>${payroll.basicSalary.toLocaleString()}</TableCell>
-                <TableCell>${payroll.allowances.toLocaleString()}</TableCell>
-                <TableCell>${payroll.deductions.toLocaleString()}</TableCell>
+                <TableCell>${calculateTotalAllowances(payroll.allowances).toLocaleString()}</TableCell>
+                <TableCell>${calculateTotalDeductions(payroll.deductions).toLocaleString()}</TableCell>
                 <TableCell>
                   $
                   {(
                     payroll.basicSalary +
-                    payroll.allowances -
-                    payroll.deductions
+                    calculateTotalAllowances(payroll.allowances) -
+                    calculateTotalDeductions(payroll.deductions)
                   ).toLocaleString()}
                 </TableCell>
                 <TableCell align="right">
@@ -330,28 +398,107 @@ const Payroll = () => {
                 startAdornment: '$',
               }}
             />
+            <Typography variant="subtitle1" color="primary" sx={{ mt: 2 }}>
+              Allowances
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={6}>
+                <TextField
+                  name="allowances.housing"
+                  label="Housing Allowance"
+                  type="number"
+                  value={formData.allowances.housing}
+                  onChange={handleInputChange}
+                  fullWidth
+                  InputProps={{
+                    startAdornment: '$',
+                  }}
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  name="allowances.transport"
+                  label="Transport Allowance"
+                  type="number"
+                  value={formData.allowances.transport}
+                  onChange={handleInputChange}
+                  fullWidth
+                  InputProps={{
+                    startAdornment: '$',
+                  }}
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  name="allowances.meal"
+                  label="Meal Allowance"
+                  type="number"
+                  value={formData.allowances.meal}
+                  onChange={handleInputChange}
+                  fullWidth
+                  InputProps={{
+                    startAdornment: '$',
+                  }}
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  name="allowances.other"
+                  label="Other Allowances"
+                  type="number"
+                  value={formData.allowances.other}
+                  onChange={handleInputChange}
+                  fullWidth
+                  InputProps={{
+                    startAdornment: '$',
+                  }}
+                />
+              </Grid>
+            </Grid>
+            <Typography variant="subtitle1" color="primary" sx={{ mt: 2 }}>
+              Deductions
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={6}>
+                <TextField
+                  name="deductions.tax"
+                  label="Tax"
+                  type="number"
+                  value={formData.deductions.tax}
+                  onChange={handleInputChange}
+                  fullWidth
+                  InputProps={{
+                    startAdornment: '$',
+                  }}
+                />
+              </Grid>
+              <Grid item xs={6}>
             <TextField
-              name="allowances"
-              label="Allowances"
+                  name="deductions.insurance"
+                  label="Insurance"
               type="number"
-              value={formData.allowances}
+                  value={formData.deductions.insurance}
               onChange={handleInputChange}
               fullWidth
               InputProps={{
                 startAdornment: '$',
               }}
             />
+              </Grid>
+              <Grid item xs={12}>
             <TextField
-              name="deductions"
-              label="Deductions"
+                  name="deductions.other"
+                  label="Other Deductions"
               type="number"
-              value={formData.deductions}
+                  value={formData.deductions.other}
               onChange={handleInputChange}
               fullWidth
               InputProps={{
                 startAdornment: '$',
               }}
             />
+              </Grid>
+            </Grid>
           </Box>
         </DialogContent>
         <DialogActions>

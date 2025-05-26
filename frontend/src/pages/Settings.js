@@ -12,6 +12,8 @@ import {
   Card,
   CardContent,
   MenuItem,
+  FormGroup,
+  Divider,
 } from '@mui/material';
 import api from '../utils/axios';
 
@@ -163,6 +165,7 @@ const Settings = () => {
 
       <Box component="form" onSubmit={handleSubmit}>
         <Grid container spacing={3}>
+          {/* Company Information */}
           <Grid item xs={12} md={6}>
             <Card>
               <CardContent>
@@ -177,6 +180,7 @@ const Settings = () => {
                       value={settings.companyName}
                       onChange={handleInputChange}
                       fullWidth
+                      required
                     />
                   </Grid>
                   <Grid item xs={12}>
@@ -187,6 +191,7 @@ const Settings = () => {
                       onChange={handleInputChange}
                       fullWidth
                       type="email"
+                      required
                     />
                   </Grid>
                   <Grid item xs={12}>
@@ -196,6 +201,7 @@ const Settings = () => {
                       value={settings.companyPhone}
                       onChange={handleInputChange}
                       fullWidth
+                      required
                     />
                   </Grid>
                   <Grid item xs={12}>
@@ -207,6 +213,7 @@ const Settings = () => {
                       fullWidth
                       multiline
                       rows={3}
+                      required
                     />
                   </Grid>
                 </Grid>
@@ -214,6 +221,7 @@ const Settings = () => {
             </Card>
           </Grid>
 
+          {/* Working Hours & Days */}
           <Grid item xs={12} md={6}>
             <Card>
               <CardContent>
@@ -229,6 +237,8 @@ const Settings = () => {
                       onChange={handleNestedInputChange('workingHours', 'start')}
                       fullWidth
                       InputLabelProps={{ shrink: true }}
+                      inputProps={{ step: 300 }}
+                      required
                     />
                   </Grid>
                   <Grid item xs={12} sm={6}>
@@ -239,13 +249,15 @@ const Settings = () => {
                       onChange={handleNestedInputChange('workingHours', 'end')}
                       fullWidth
                       InputLabelProps={{ shrink: true }}
+                      inputProps={{ step: 300 }}
+                      required
                     />
                   </Grid>
                   <Grid item xs={12}>
                     <Typography variant="subtitle2" gutterBottom>
                       Working Days
                     </Typography>
-                    <Box display="flex" flexWrap="wrap" gap={2}>
+                    <FormGroup row>
                       {workingDaysOptions.map((day) => (
                         <FormControlLabel
                           key={day}
@@ -253,18 +265,20 @@ const Settings = () => {
                             <Switch
                               checked={settings.workingDays.includes(day)}
                               onChange={handleWorkingDaysChange(day)}
+                              color="primary"
                             />
                           }
                           label={day}
                         />
                       ))}
-                    </Box>
+                    </FormGroup>
                   </Grid>
                 </Grid>
               </CardContent>
             </Card>
           </Grid>
 
+          {/* Leave Settings */}
           <Grid item xs={12} md={6}>
             <Card>
               <CardContent>
@@ -279,6 +293,7 @@ const Settings = () => {
                       value={settings.leaveSettings.annualLeaveQuota}
                       onChange={handleNestedInputChange('leaveSettings', 'annualLeaveQuota')}
                       fullWidth
+                      required
                       InputProps={{ inputProps: { min: 0 } }}
                     />
                   </Grid>
@@ -289,6 +304,7 @@ const Settings = () => {
                       value={settings.leaveSettings.sickLeaveQuota}
                       onChange={handleNestedInputChange('leaveSettings', 'sickLeaveQuota')}
                       fullWidth
+                      required
                       InputProps={{ inputProps: { min: 0 } }}
                     />
                   </Grid>
@@ -299,6 +315,7 @@ const Settings = () => {
                       value={settings.leaveSettings.carryForwardLimit}
                       onChange={handleNestedInputChange('leaveSettings', 'carryForwardLimit')}
                       fullWidth
+                      required
                       InputProps={{ inputProps: { min: 0 } }}
                     />
                   </Grid>
@@ -307,6 +324,7 @@ const Settings = () => {
             </Card>
           </Grid>
 
+          {/* Payroll Settings */}
           <Grid item xs={12} md={6}>
             <Card>
               <CardContent>
@@ -321,6 +339,7 @@ const Settings = () => {
                       value={settings.payrollSettings.payrollCycle}
                       onChange={handleNestedInputChange('payrollSettings', 'payrollCycle')}
                       fullWidth
+                      required
                     >
                       {payrollCycleOptions.map((option) => (
                         <MenuItem key={option} value={option}>
@@ -336,7 +355,9 @@ const Settings = () => {
                       value={settings.payrollSettings.payDay}
                       onChange={handleNestedInputChange('payrollSettings', 'payDay')}
                       fullWidth
+                      required
                       InputProps={{ inputProps: { min: 1, max: 31 } }}
+                      helperText="Day of month for salary payment"
                     />
                   </Grid>
                   <Grid item xs={12}>
@@ -346,6 +367,7 @@ const Settings = () => {
                       value={settings.payrollSettings.taxRate}
                       onChange={handleNestedInputChange('payrollSettings', 'taxRate')}
                       fullWidth
+                      required
                       InputProps={{ inputProps: { min: 0, max: 100 } }}
                     />
                   </Grid>
@@ -356,7 +378,9 @@ const Settings = () => {
                       value={settings.payrollSettings.overtimeRate}
                       onChange={handleNestedInputChange('payrollSettings', 'overtimeRate')}
                       fullWidth
-                      InputProps={{ inputProps: { min: 1 } }}
+                      required
+                      InputProps={{ inputProps: { min: 1, step: 0.1 } }}
+                      helperText="Multiplier for overtime hours (e.g., 1.5 for time and a half)"
                     />
                   </Grid>
                 </Grid>
@@ -364,6 +388,7 @@ const Settings = () => {
             </Card>
           </Grid>
 
+          {/* Email Notifications */}
           <Grid item xs={12}>
             <Card>
               <CardContent>
@@ -372,57 +397,56 @@ const Settings = () => {
                 </Typography>
                 <Grid container spacing={2}>
                   <Grid item xs={12}>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={settings.emailNotifications.leaveRequests}
-                          onChange={handleNotificationToggle('leaveRequests')}
-                        />
-                      }
-                      label="Leave Request Notifications"
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={settings.emailNotifications.payrollGeneration}
-                          onChange={handleNotificationToggle('payrollGeneration')}
-                        />
-                      }
-                      label="Payroll Generation Notifications"
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={settings.emailNotifications.attendanceAlerts}
-                          onChange={handleNotificationToggle('attendanceAlerts')}
-                        />
-                      }
-                      label="Attendance Alert Notifications"
-                    />
+                    <FormGroup>
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={settings.emailNotifications.leaveRequests}
+                            onChange={handleNotificationToggle('leaveRequests')}
+                            color="primary"
+                          />
+                        }
+                        label="Leave Requests"
+                      />
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={settings.emailNotifications.payrollGeneration}
+                            onChange={handleNotificationToggle('payrollGeneration')}
+                            color="primary"
+                          />
+                        }
+                        label="Payroll Generation"
+                      />
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            checked={settings.emailNotifications.attendanceAlerts}
+                            onChange={handleNotificationToggle('attendanceAlerts')}
+                            color="primary"
+                          />
+                        }
+                        label="Attendance Alerts"
+                      />
+                    </FormGroup>
                   </Grid>
                 </Grid>
               </CardContent>
             </Card>
           </Grid>
-
-          <Grid item xs={12}>
-            <Box display="flex" justifyContent="flex-end">
-              <Button
-                type="submit"
-                variant="contained"
-                color="primary"
-                size="large"
-                disabled={loading}
-              >
-                {loading ? <CircularProgress size={24} /> : 'Save Settings'}
-              </Button>
-            </Box>
-          </Grid>
         </Grid>
+
+        <Box mt={3} display="flex" justifyContent="flex-end">
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            disabled={loading}
+            sx={{ minWidth: 200 }}
+          >
+            {loading ? <CircularProgress size={24} /> : 'Save Settings'}
+          </Button>
+        </Box>
       </Box>
     </Box>
   );

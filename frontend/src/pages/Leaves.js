@@ -19,6 +19,7 @@ import {
   CircularProgress,
   MenuItem,
   Chip,
+  Alert,
 } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -30,13 +31,15 @@ const leaveTypes = ['Annual', 'Sick', 'Personal', 'Maternity', 'Paternity', 'Unp
 const statusOptions = ['Pending', 'Approved', 'Rejected'];
 
 const getStatusColor = (status) => {
-  switch (status) {
-    case 'Approved':
+  switch (status.toLowerCase()) {
+    case 'approved':
       return 'success';
-    case 'Rejected':
+    case 'pending':
+      return 'warning';
+    case 'rejected':
       return 'error';
     default:
-      return 'warning';
+      return 'default';
   }
 };
 
@@ -48,7 +51,7 @@ const Leaves = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedLeave, setSelectedLeave] = useState(null);
   const [formData, setFormData] = useState({
-    type: 'Annual',
+    leaveType: 'Annual',
     startDate: '',
     endDate: '',
     reason: '',
@@ -58,15 +61,17 @@ const Leaves = () => {
   const fetchLeaves = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await api.get(user.role === 'admin' ? '/leaves' : '/leaves/my-leaves');
-      setLeaves(response.data);
       setError(null);
+      // If user is admin, fetch all leaves, else fetch user's leaves
+      const endpoint = user?.role === 'admin' ? '/leaves' : '/leaves/my-leaves';
+      const response = await api.get(endpoint);
+      setLeaves(response.data);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to fetch leaves');
     } finally {
       setLoading(false);
     }
-  }, [user.role]);
+  }, [user]);
 
   useEffect(() => {
     fetchLeaves();
@@ -82,7 +87,7 @@ const Leaves = () => {
       setSelectedLeave(leave);
     } else {
       setFormData({
-        type: 'Annual',
+        leaveType: 'Annual',
         startDate: '',
         endDate: '',
         reason: '',
@@ -97,7 +102,7 @@ const Leaves = () => {
     setOpenDialog(false);
     setSelectedLeave(null);
     setFormData({
-      type: 'Annual',
+      leaveType: 'Annual',
       startDate: '',
       endDate: '',
       reason: '',
@@ -149,7 +154,7 @@ const Leaves = () => {
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
         <CircularProgress />
       </Box>
     );
@@ -157,8 +162,8 @@ const Leaves = () => {
 
   if (error) {
     return (
-      <Box>
-        <Typography color="error">{error}</Typography>
+      <Box m={2}>
+        <Alert severity="error">{error}</Alert>
       </Box>
     );
   }
@@ -166,8 +171,10 @@ const Leaves = () => {
   return (
     <Box>
       <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">Leave Management</Typography>
-        {!user.role === 'admin' && (
+        <Typography variant="h4">
+          {user?.role === 'admin' ? 'All Leave Requests' : 'My Leave Requests'}
+        </Typography>
+        {user?.role !== 'admin' && (
           <Button
             variant="contained"
             color="primary"
@@ -183,24 +190,29 @@ const Leaves = () => {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Employee</TableCell>
-              <TableCell>Type</TableCell>
+              {user?.role === 'admin' && <TableCell>Employee</TableCell>}
+              <TableCell>Leave Type</TableCell>
               <TableCell>Start Date</TableCell>
               <TableCell>End Date</TableCell>
-              <TableCell>Status</TableCell>
+              <TableCell>Duration (Days)</TableCell>
               <TableCell>Reason</TableCell>
+              <TableCell>Status</TableCell>
               <TableCell align="right">Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {leaves.map((leave) => (
               <TableRow key={leave._id}>
+                {user?.role === 'admin' && (
                 <TableCell>
-                  {leave.employee.firstName} {leave.employee.lastName}
+                    {leave.user.firstName} {leave.user.lastName}
                 </TableCell>
-                <TableCell>{leave.type}</TableCell>
+                )}
+                <TableCell>{leave.leaveType}</TableCell>
                 <TableCell>{new Date(leave.startDate).toLocaleDateString()}</TableCell>
                 <TableCell>{new Date(leave.endDate).toLocaleDateString()}</TableCell>
+                <TableCell>{leave.duration}</TableCell>
+                <TableCell>{leave.reason}</TableCell>
                 <TableCell>
                   <Chip
                     label={leave.status}
@@ -208,15 +220,14 @@ const Leaves = () => {
                     size="small"
                   />
                 </TableCell>
-                <TableCell>{leave.reason}</TableCell>
                 <TableCell align="right">
-                  {user.role === 'admin' ? (
-                    <Box>
+                  {user?.role === 'admin' ? (
+                    leave.status === 'Pending' && (
+                      <>
                       <Button
                         size="small"
                         color="success"
                         onClick={() => handleStatusChange(leave._id, 'Approved')}
-                        disabled={leave.status !== 'Pending'}
                       >
                         Approve
                       </Button>
@@ -224,28 +235,30 @@ const Leaves = () => {
                         size="small"
                         color="error"
                         onClick={() => handleStatusChange(leave._id, 'Rejected')}
-                        disabled={leave.status !== 'Pending'}
                       >
                         Reject
                       </Button>
-                    </Box>
+                      </>
+                    )
                   ) : (
+                    leave.status === 'Pending' && (
                     <>
                       <IconButton
                         onClick={() => handleOpenDialog(leave)}
                         color="primary"
-                        disabled={leave.status !== 'Pending'}
+                          size="small"
                       >
                         <EditIcon />
                       </IconButton>
                       <IconButton
                         onClick={() => handleDelete(leave._id)}
                         color="error"
-                        disabled={leave.status !== 'Pending'}
+                          size="small"
                       >
                         <DeleteIcon />
                       </IconButton>
                     </>
+                    )
                   )}
                 </TableCell>
               </TableRow>
@@ -261,10 +274,10 @@ const Leaves = () => {
         <DialogContent>
           <Box display="flex" flexDirection="column" gap={2} mt={2}>
             <TextField
-              name="type"
+              name="leaveType"
               label="Leave Type"
               select
-              value={formData.type}
+              value={formData.leaveType}
               onChange={handleInputChange}
               fullWidth
             >

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -23,16 +23,31 @@ const Profile = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  
   const [formData, setFormData] = useState({
-    firstName: user?.firstName || '',
-    lastName: user?.lastName || '',
-    email: user?.email || '',
-    phone: user?.phone || '',
-    address: user?.address || '',
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    address: '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
   });
+
+  // Update form data when user data changes
+  useEffect(() => {
+    if (user) {
+      setFormData(prev => ({
+        ...prev,
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        email: user.email || '',
+        phone: user.phoneNumber || '', // Map phoneNumber to phone
+        address: user.address || '',
+      }));
+    }
+  }, [user]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -53,8 +68,19 @@ const Profile = () => {
 
       const { currentPassword, newPassword, confirmPassword, ...profileData } = formData;
 
-      await api.put('/users/profile', profileData);
-      dispatch(getUserProfile());
+      // Filter out empty values
+      const filteredData = Object.fromEntries(
+        Object.entries(profileData).filter(([_, value]) => value !== '')
+      );
+
+      // Map phone to phoneNumber before sending
+      if (filteredData.phone) {
+        filteredData.phoneNumber = filteredData.phone;
+        delete filteredData.phone;
+      }
+
+      await api.put('/users/profile', filteredData);
+      await dispatch(getUserProfile()).unwrap();
       setSuccess('Profile updated successfully');
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update profile');
@@ -65,8 +91,20 @@ const Profile = () => {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
+    
+    // Validate password fields
+    if (!formData.currentPassword || !formData.newPassword || !formData.confirmPassword) {
+      setError('All password fields are required');
+      return;
+    }
+    
     if (formData.newPassword !== formData.confirmPassword) {
       setError('New passwords do not match');
+      return;
+    }
+
+    if (formData.newPassword.length < 6) {
+      setError('New password must be at least 6 characters long');
       return;
     }
 
