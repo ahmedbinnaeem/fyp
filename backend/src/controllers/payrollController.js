@@ -14,11 +14,7 @@ const createPayroll = async (req, res) => {
       basicSalary,
       allowances,
       deductions,
-      overtime,
-      bonus,
-      paymentMethod,
-      bankDetails,
-      comments
+      netSalary
     } = req.body;
 
     // Check if payroll already exists for this month
@@ -32,70 +28,30 @@ const createPayroll = async (req, res) => {
       return res.status(400).json({ message: 'Payroll already exists for this month' });
     }
 
-    // Convert string values to numbers if needed
-    const parsedBasicSalary = Number(basicSalary);
-
-    // Process allowances
-    const processedAllowances = {
-      housing: Number(allowances.housing) || 0,
-      transport: Number(allowances.transport) || 0,
-      meal: Number(allowances.meal) || 0,
-      other: Number(allowances.other) || 0
-    };
-
-    // Process deductions
-    const processedDeductions = {
-      tax: Number(deductions.tax) || 0,
-      insurance: Number(deductions.insurance) || 0,
-      other: Number(deductions.other) || 0
-    };
-
-    // Calculate total allowances and deductions
-    const totalAllowances = Object.values(processedAllowances).reduce((a, b) => a + b, 0);
-    const totalDeductions = Object.values(processedDeductions).reduce((a, b) => a + b, 0);
-
-    // Calculate net salary
-    const netSalary = parsedBasicSalary + totalAllowances - totalDeductions;
-
+    // Create new payroll with validated data
     const payroll = await Payroll.create({
       user: employee,
       month: Number(month),
       year: Number(year),
-      basicSalary: parsedBasicSalary,
-      allowances: processedAllowances,
-      deductions: processedDeductions,
-      netSalary,
-      paymentMethod: paymentMethod || 'bank_transfer',
-      bankDetails,
-      comments,
-      status: 'pending'
+      basicSalary: Number(basicSalary),
+      allowances: {
+        housing: Number(allowances.housing || 0),
+        transport: Number(allowances.transport || 0),
+        meal: Number(allowances.meal || 0),
+        other: Number(allowances.other || 0)
+      },
+      deductions: {
+        tax: Number(deductions.tax || 0),
+        insurance: Number(deductions.insurance || 0),
+        other: Number(deductions.other || 0)
+      },
+      netSalary: Number(netSalary)
     });
 
     const populatedPayroll = await Payroll.findById(payroll._id)
       .populate('user', 'firstName lastName email department');
 
-    // Format response to match frontend expectations
-    const response = {
-      _id: populatedPayroll._id,
-      employee: {
-        _id: populatedPayroll.user._id,
-        firstName: populatedPayroll.user.firstName,
-        lastName: populatedPayroll.user.lastName,
-        email: populatedPayroll.user.email,
-        department: populatedPayroll.user.department
-      },
-      basicSalary: populatedPayroll.basicSalary,
-      allowances: populatedPayroll.allowances,
-      deductions: populatedPayroll.deductions,
-      netSalary: populatedPayroll.netSalary,
-      month: populatedPayroll.month,
-      year: populatedPayroll.year,
-      status: populatedPayroll.status,
-      createdAt: populatedPayroll.createdAt,
-      updatedAt: populatedPayroll.updatedAt
-    };
-
-    res.status(201).json(response);
+    res.status(201).json(populatedPayroll);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -287,27 +243,33 @@ const updatePayroll = async (req, res) => {
       return res.status(404).json({ message: 'Payroll not found' });
     }
 
-    // Update basic calculations
-    if (req.body.basicSalary) {
-      const perDaySalary = req.body.basicSalary / payroll.totalDays;
-      const deductions = (payroll.totalDays - payroll.workingDays) * perDaySalary;
-      const allowances = req.body.basicSalary * 0.1;
-      const grossSalary = req.body.basicSalary + allowances;
-      const netSalary = grossSalary - deductions;
+    const {
+      basicSalary,
+      allowances,
+      deductions,
+      netSalary
+    } = req.body;
 
-      Object.assign(payroll, {
-        ...req.body,
-        allowances,
-        deductions,
-        grossSalary,
-        netSalary,
-      });
-    } else {
-      Object.assign(payroll, req.body);
-    }
+    // Update with validated data
+    payroll.basicSalary = Number(basicSalary);
+    payroll.allowances = {
+      housing: Number(allowances.housing || 0),
+      transport: Number(allowances.transport || 0),
+      meal: Number(allowances.meal || 0),
+      other: Number(allowances.other || 0)
+    };
+    payroll.deductions = {
+      tax: Number(deductions.tax || 0),
+      insurance: Number(deductions.insurance || 0),
+      other: Number(deductions.other || 0)
+    };
+    payroll.netSalary = Number(netSalary);
 
     const updatedPayroll = await payroll.save();
-    res.json(updatedPayroll);
+    const populatedPayroll = await Payroll.findById(updatedPayroll._id)
+      .populate('user', 'firstName lastName email department');
+
+    res.json(populatedPayroll);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

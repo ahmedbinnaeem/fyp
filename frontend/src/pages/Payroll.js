@@ -121,19 +121,34 @@ const Payroll = () => {
 
   const handleSubmit = async (values) => {
     try {
+      // Extract and convert allowances
+      const allowances = {
+        housing: values['allowances.housing'] ? Number(values['allowances.housing']) : 0,
+        transport: values['allowances.transport'] ? Number(values['allowances.transport']) : 0,
+        meal: values['allowances.meal'] ? Number(values['allowances.meal']) : 0,
+        other: values['allowances.other'] ? Number(values['allowances.other']) : 0
+      };
+
+      // Extract and convert deductions
+      const deductions = {
+        tax: values['deductions.tax'] ? Number(values['deductions.tax']) : 0,
+        insurance: values['deductions.insurance'] ? Number(values['deductions.insurance']) : 0,
+        other: values['deductions.other'] ? Number(values['deductions.other']) : 0
+      };
+
+      // Calculate totals
+      const totalAllowances = Object.values(allowances).reduce((a, b) => a + b, 0);
+      const totalDeductions = Object.values(deductions).reduce((a, b) => a + b, 0);
+      const netSalary = Number(values.basicSalary) + totalAllowances - totalDeductions;
+
       const payload = {
-        ...values,
-        allowances: {
-          housing: Number(values['allowances.housing']) || 0,
-          transport: Number(values['allowances.transport']) || 0,
-          meal: Number(values['allowances.meal']) || 0,
-          other: Number(values['allowances.other']) || 0,
-        },
-        deductions: {
-          tax: Number(values['deductions.tax']) || 0,
-          insurance: Number(values['deductions.insurance']) || 0,
-          other: Number(values['deductions.other']) || 0,
-        },
+        employee: values.employee,
+        month: values.month || selectedMonth.getMonth() + 1,
+        year: values.year || selectedMonth.getFullYear(),
+        basicSalary: Number(values.basicSalary),
+        allowances,
+        deductions,
+        netSalary
       };
 
       if (selectedPayroll) {

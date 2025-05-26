@@ -25,8 +25,7 @@ const Login = () => {
 
   const handleSubmit = async (values) => {
     try {
-      const loggedInUser = login(values)
-      await dispatch(loggedInUser).unwrap();
+      const loggedInUser = await dispatch(login(values)).unwrap();
       const from = location.state?.from?.pathname || (loggedInUser.role === 'admin' ? '/dashboard' : '/attendance');
       navigate(from, { replace: true });
     } catch (err) {
