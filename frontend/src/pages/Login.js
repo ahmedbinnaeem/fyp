@@ -25,8 +25,9 @@ const Login = () => {
 
   const handleSubmit = async (values) => {
     try {
-      await dispatch(login(values)).unwrap();
-      const from = location.state?.from?.pathname || '/dashboard';
+      const loggedInUser = login(values)
+      await dispatch(loggedInUser).unwrap();
+      const from = location.state?.from?.pathname || (loggedInUser.role === 'admin' ? '/dashboard' : '/attendance');
       navigate(from, { replace: true });
     } catch (err) {
       // Error is handled by the auth slice

@@ -57,7 +57,7 @@ const Header = ({ collapsed, toggle, icon }) => {
       icon: <UserOutlined />,
       onClick: () => navigate('/profile'),
     },
-    {
+    user.role === 'admin' && {
       key: 'settings',
       label: 'Settings',
       icon: <SettingOutlined />,
