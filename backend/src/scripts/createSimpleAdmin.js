@@ -25,7 +25,7 @@ async function createAdmin() {
     await User.deleteMany({ role: 'admin' });
     
     // Create password hash
-    const plainPassword = 'Admin@123';
+    const plainPassword = 'passowrd';
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(plainPassword, salt);
 
@@ -33,7 +33,7 @@ async function createAdmin() {
     const admin = await User.create({
       firstName: 'Admin',
       lastName: 'User',
-      email: 'admin@hrms.com',
+      email: 'admin@teampulse.com',
       password: hashedPassword,
       role: 'admin',
       department: 'Management'
