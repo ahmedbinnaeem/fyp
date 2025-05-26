@@ -9,19 +9,21 @@ const {
   deleteAttendance,
   clockIn,
   clockOut,
+  getClockInStatus,
 } = require('../controllers/attendanceController');
 const { protect, admin } = require('../middleware/authMiddleware');
 
 // Clock in/out routes
 router.post('/clock-in', protect, clockIn);
 router.post('/clock-out', protect, clockOut);
+router.get('/status', protect, getClockInStatus);
 
-// Place specific routes before parameter routes
-router.get('/my-attendance', protect, getMyAttendance);
-
+// Regular attendance routes
 router.route('/')
-  .post(protect, admin, createAttendance)
-  .get(protect, admin, getAttendances);
+  .get(protect, admin, getAttendances)
+  .post(protect, createAttendance);
+
+router.get('/my-attendance', protect, getMyAttendance);
 
 router.route('/:id')
   .get(protect, getAttendanceById)

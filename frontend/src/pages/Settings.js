@@ -1,53 +1,33 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Box,
-  Typography,
-  Grid,
-  TextField,
+  Card,
+  Row,
+  Col,
+  Form,
+  Input,
   Button,
-  CircularProgress,
+  Typography,
+  Spin,
   Alert,
   Switch,
-  FormControlLabel,
-  Card,
-  CardContent,
-  MenuItem,
-  FormGroup,
+  TimePicker,
+  Select,
+  Checkbox,
+  Space,
   Divider,
-} from '@mui/material';
+  InputNumber,
+  message,
+} from 'antd';
 import api from '../utils/axios';
+import dayjs from 'dayjs';
+
+const { Title } = Typography;
+const { TextArea } = Input;
 
 const Settings = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
-  const [settings, setSettings] = useState({
-    companyName: '',
-    companyEmail: '',
-    companyPhone: '',
-    companyAddress: '',
-    workingDays: [],
-    workingHours: {
-      start: '',
-      end: '',
-    },
-    leaveSettings: {
-      annualLeaveQuota: '',
-      sickLeaveQuota: '',
-      carryForwardLimit: '',
-    },
-    payrollSettings: {
-      payrollCycle: 'monthly',
-      payDay: '',
-      taxRate: '',
-      overtimeRate: '',
-    },
-    emailNotifications: {
-      leaveRequests: true,
-      payrollGeneration: true,
-      attendanceAlerts: true,
-    },
-  });
+  const [form] = Form.useForm();
 
   const workingDaysOptions = [
     'Monday',
@@ -69,386 +49,289 @@ const Settings = () => {
     try {
       setLoading(true);
       const response = await api.get('/settings');
-      setSettings(response.data);
+      
+      // Convert time strings to dayjs objects
+      const formData = {
+        ...response.data,
+        workingHours: {
+          start: response.data.workingHours?.start ? dayjs(response.data.workingHours.start, 'HH:mm') : null,
+          end: response.data.workingHours?.end ? dayjs(response.data.workingHours.end, 'HH:mm') : null,
+        },
+      };
+      
+      form.setFieldsValue(formData);
       setError(null);
     } catch (err) {
+      message.error(err.response?.data?.message || 'Failed to fetch settings');
       setError(err.response?.data?.message || 'Failed to fetch settings');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setSettings((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-    setError(null);
-    setSuccess(null);
-  };
-
-  const handleNestedInputChange = (section, field) => (e) => {
-    const { value } = e.target;
-    setSettings((prev) => ({
-      ...prev,
-      [section]: {
-        ...prev[section],
-        [field]: value,
-      },
-    }));
-    setError(null);
-    setSuccess(null);
-  };
-
-  const handleNotificationToggle = (field) => (e) => {
-    setSettings((prev) => ({
-      ...prev,
-      emailNotifications: {
-        ...prev.emailNotifications,
-        [field]: e.target.checked,
-      },
-    }));
-  };
-
-  const handleWorkingDaysChange = (day) => (e) => {
-    const { checked } = e.target;
-    setSettings((prev) => ({
-      ...prev,
-      workingDays: checked
-        ? [...prev.workingDays, day]
-        : prev.workingDays.filter((d) => d !== day),
-    }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (values) => {
     try {
       setLoading(true);
       setError(null);
-      setSuccess(null);
 
-      await api.put('/settings', settings);
-      setSuccess('Settings updated successfully');
+      // Ensure workingHours values are dayjs objects before formatting
+      const formattedValues = {
+        ...values,
+        workingHours: {
+          start: dayjs.isDayjs(values.workingHours?.start) ? values.workingHours.start.format('HH:mm') : null,
+          end: dayjs.isDayjs(values.workingHours?.end) ? values.workingHours.end.format('HH:mm') : null,
+        },
+      };
+
+      await api.put('/settings', formattedValues);
+      message.success('Settings updated successfully');
     } catch (err) {
+      message.error(err.response?.data?.message || 'Failed to update settings');
       setError(err.response?.data?.message || 'Failed to update settings');
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading && !settings.companyName) {
+  if (loading && !form.getFieldValue('companyName')) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
-        <CircularProgress />
-      </Box>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <Spin size="large" />
+      </div>
     );
   }
 
   return (
-    <Box>
-      <Typography variant="h4" gutterBottom>
-        System Settings
-      </Typography>
+    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
+      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+      <Title level={2}>System Settings</Title>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+      {error && <Alert message={error} type="error" showIcon style={{ marginBottom: 24 }} />}
 
-      {success && (
-        <Alert severity="success" sx={{ mb: 2 }}>
-          {success}
-        </Alert>
-      )}
 
-      <Box component="form" onSubmit={handleSubmit}>
-        <Grid container spacing={3}>
-          {/* Company Information */}
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Company Information
-                </Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={12}>
-                    <TextField
-                      name="companyName"
-                      label="Company Name"
-                      value={settings.companyName}
-                      onChange={handleInputChange}
-                      fullWidth
-                      required
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      name="companyEmail"
-                      label="Company Email"
-                      value={settings.companyEmail}
-                      onChange={handleInputChange}
-                      fullWidth
-                      type="email"
-                      required
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      name="companyPhone"
-                      label="Company Phone"
-                      value={settings.companyPhone}
-                      onChange={handleInputChange}
-                      fullWidth
-                      required
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      name="companyAddress"
-                      label="Company Address"
-                      value={settings.companyAddress}
-                      onChange={handleInputChange}
-                      fullWidth
-                      multiline
-                      rows={3}
-                      required
-                    />
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          </Grid>
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSubmit}
+          initialValues={{
+            emailNotifications: {
+              leaveRequests: true,
+              payrollGeneration: true,
+              attendanceAlerts: true,
+            },
+            workingDays: [],
+            payrollSettings: {
+              payrollCycle: 'monthly',
+            },
+          }}
+        >
+          <Row gutter={[24, 24]}>
+            {/* Company Information */}
+            <Col xs={24} lg={12}>
+              <Card title="Company Information" bordered={false} style={{ height: '100%' }}>
+                <Form.Item
+                  name="companyName"
+                  label="Company Name"
+                  rules={[{ required: true, message: 'Please enter company name' }]}
+                >
+                  <Input />
+                </Form.Item>
 
-          {/* Working Hours & Days */}
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Working Hours & Days
-                </Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
+                <Form.Item
+                  name="companyEmail"
+                  label="Company Email"
+                  rules={[
+                    { required: true, message: 'Please enter company email' },
+                    { type: 'email', message: 'Please enter a valid email' },
+                  ]}
+                >
+                  <Input />
+                </Form.Item>
+
+                <Form.Item
+                  name="companyPhone"
+                  label="Company Phone"
+                  rules={[{ required: true, message: 'Please enter company phone' }]}
+                >
+                  <Input />
+                </Form.Item>
+
+                <Form.Item
+                  name="companyAddress"
+                  label="Company Address"
+                  rules={[{ required: true, message: 'Please enter company address' }]}
+                >
+                  <TextArea rows={3} />
+                </Form.Item>
+              </Card>
+            </Col>
+
+            {/* Working Hours & Days */}
+            <Col xs={24} lg={12}>
+              <Card title="Working Hours & Days" bordered={false} style={{ height: '100%' }}>
+                <Row gutter={16}>
+                  <Col span={12}>
+                    <Form.Item
+                      name={['workingHours', 'start']}
                       label="Start Time"
-                      type="time"
-                      value={settings.workingHours.start}
-                      onChange={handleNestedInputChange('workingHours', 'start')}
-                      fullWidth
-                      InputLabelProps={{ shrink: true }}
-                      inputProps={{ step: 300 }}
-                      required
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      label="End Time"
-                      type="time"
-                      value={settings.workingHours.end}
-                      onChange={handleNestedInputChange('workingHours', 'end')}
-                      fullWidth
-                      InputLabelProps={{ shrink: true }}
-                      inputProps={{ step: 300 }}
-                      required
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Typography variant="subtitle2" gutterBottom>
-                      Working Days
-                    </Typography>
-                    <FormGroup row>
-                      {workingDaysOptions.map((day) => (
-                        <FormControlLabel
-                          key={day}
-                          control={
-                            <Switch
-                              checked={settings.workingDays.includes(day)}
-                              onChange={handleWorkingDaysChange(day)}
-                              color="primary"
-                            />
-                          }
-                          label={day}
-                        />
-                      ))}
-                    </FormGroup>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Leave Settings */}
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Leave Settings
-                </Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={12}>
-                    <TextField
-                      label="Annual Leave Quota"
-                      type="number"
-                      value={settings.leaveSettings.annualLeaveQuota}
-                      onChange={handleNestedInputChange('leaveSettings', 'annualLeaveQuota')}
-                      fullWidth
-                      required
-                      InputProps={{ inputProps: { min: 0 } }}
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      label="Sick Leave Quota"
-                      type="number"
-                      value={settings.leaveSettings.sickLeaveQuota}
-                      onChange={handleNestedInputChange('leaveSettings', 'sickLeaveQuota')}
-                      fullWidth
-                      required
-                      InputProps={{ inputProps: { min: 0 } }}
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      label="Carry Forward Limit"
-                      type="number"
-                      value={settings.leaveSettings.carryForwardLimit}
-                      onChange={handleNestedInputChange('leaveSettings', 'carryForwardLimit')}
-                      fullWidth
-                      required
-                      InputProps={{ inputProps: { min: 0 } }}
-                    />
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          {/* Payroll Settings */}
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Payroll Settings
-                </Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={12}>
-                    <TextField
-                      select
-                      label="Payroll Cycle"
-                      value={settings.payrollSettings.payrollCycle}
-                      onChange={handleNestedInputChange('payrollSettings', 'payrollCycle')}
-                      fullWidth
-                      required
+                      rules={[{ required: true, message: 'Please select start time' }]}
                     >
-                      {payrollCycleOptions.map((option) => (
-                        <MenuItem key={option} value={option}>
-                          {option.charAt(0).toUpperCase() + option.slice(1)}
-                        </MenuItem>
+                      <TimePicker format="HH:mm" style={{ width: '100%' }} />
+                    </Form.Item>
+                  </Col>
+                  <Col span={12}>
+                    <Form.Item
+                      name={['workingHours', 'end']}
+                      label="End Time"
+                      rules={[{ required: true, message: 'Please select end time' }]}
+                    >
+                      <TimePicker format="HH:mm" style={{ width: '100%' }} />
+                    </Form.Item>
+                  </Col>
+                </Row>
+
+                <Form.Item name="workingDays" label="Working Days">
+                  <Checkbox.Group style={{ width: '100%' }}>
+                    <Row gutter={[8, 8]}>
+                      {workingDaysOptions.map(day => (
+                        <Col span={12} key={day}>
+                          <Checkbox value={day}>{day}</Checkbox>
+                        </Col>
                       ))}
-                    </TextField>
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      label="Pay Day"
-                      type="number"
-                      value={settings.payrollSettings.payDay}
-                      onChange={handleNestedInputChange('payrollSettings', 'payDay')}
-                      fullWidth
-                      required
-                      InputProps={{ inputProps: { min: 1, max: 31 } }}
-                      helperText="Day of month for salary payment"
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      label="Tax Rate (%)"
-                      type="number"
-                      value={settings.payrollSettings.taxRate}
-                      onChange={handleNestedInputChange('payrollSettings', 'taxRate')}
-                      fullWidth
-                      required
-                      InputProps={{ inputProps: { min: 0, max: 100 } }}
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <TextField
-                      label="Overtime Rate"
-                      type="number"
-                      value={settings.payrollSettings.overtimeRate}
-                      onChange={handleNestedInputChange('payrollSettings', 'overtimeRate')}
-                      fullWidth
-                      required
-                      InputProps={{ inputProps: { min: 1, step: 0.1 } }}
-                      helperText="Multiplier for overtime hours (e.g., 1.5 for time and a half)"
-                    />
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          </Grid>
+                    </Row>
+                  </Checkbox.Group>
+                </Form.Item>
+              </Card>
+            </Col>
 
-          {/* Email Notifications */}
-          <Grid item xs={12}>
-            <Card>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Email Notifications
-                </Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={12}>
-                    <FormGroup>
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={settings.emailNotifications.leaveRequests}
-                            onChange={handleNotificationToggle('leaveRequests')}
-                            color="primary"
-                          />
-                        }
-                        label="Leave Requests"
-                      />
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={settings.emailNotifications.payrollGeneration}
-                            onChange={handleNotificationToggle('payrollGeneration')}
-                            color="primary"
-                          />
-                        }
-                        label="Payroll Generation"
-                      />
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={settings.emailNotifications.attendanceAlerts}
-                            onChange={handleNotificationToggle('attendanceAlerts')}
-                            color="primary"
-                          />
-                        }
-                        label="Attendance Alerts"
-                      />
-                    </FormGroup>
-                  </Grid>
-                </Grid>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+            {/* Leave Settings */}
+            <Col xs={24} lg={12}>
+              <Card title="Leave Settings" bordered={false} style={{ height: '100%' }}>
+                <Form.Item
+                  name={['leaveSettings', 'annualLeaveQuota']}
+                  label="Annual Leave Quota"
+                  rules={[{ required: true, message: 'Please enter annual leave quota' }]}
+                >
+                  <InputNumber min={0} style={{ width: '100%' }} />
+                </Form.Item>
 
-        <Box mt={3} display="flex" justifyContent="flex-end">
-          <Button
-            type="submit"
-            variant="contained"
-            color="primary"
-            disabled={loading}
-            sx={{ minWidth: 200 }}
-          >
-            {loading ? <CircularProgress size={24} /> : 'Save Settings'}
-          </Button>
-        </Box>
-      </Box>
-    </Box>
+                <Form.Item
+                  name={['leaveSettings', 'sickLeaveQuota']}
+                  label="Sick Leave Quota"
+                  rules={[{ required: true, message: 'Please enter sick leave quota' }]}
+                >
+                  <InputNumber min={0} style={{ width: '100%' }} />
+                </Form.Item>
+
+                <Form.Item
+                  name={['leaveSettings', 'carryForwardLimit']}
+                  label="Carry Forward Limit"
+                  rules={[{ required: true, message: 'Please enter carry forward limit' }]}
+                >
+                  <InputNumber min={0} style={{ width: '100%' }} />
+                </Form.Item>
+              </Card>
+            </Col>
+
+            {/* Payroll Settings */}
+            <Col xs={24} lg={12}>
+              <Card title="Payroll Settings" bordered={false} style={{ height: '100%' }}>
+                <Form.Item
+                  name={['payrollSettings', 'payrollCycle']}
+                  label="Payroll Cycle"
+                  rules={[{ required: true, message: 'Please select payroll cycle' }]}
+                >
+                  <Select>
+                    {payrollCycleOptions.map(cycle => (
+                      <Select.Option key={cycle} value={cycle}>
+                        {cycle.charAt(0).toUpperCase() + cycle.slice(1)}
+                      </Select.Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+
+                <Form.Item
+                  name={['payrollSettings', 'payDay']}
+                  label="Pay Day"
+                  rules={[{ required: true, message: 'Please enter pay day' }]}
+                >
+                  <InputNumber min={1} max={31} style={{ width: '100%' }} />
+                </Form.Item>
+
+                <Form.Item
+                  name={['payrollSettings', 'taxRate']}
+                  label="Tax Rate (%)"
+                  rules={[{ required: true, message: 'Please enter tax rate' }]}
+                >
+                  <InputNumber
+                    min={0}
+                    max={100}
+                    style={{ width: '100%' }}
+                    formatter={value => `${value}%`}
+                    parser={value => value.replace('%', '')}
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  name={['payrollSettings', 'overtimeRate']}
+                  label="Overtime Rate"
+                  rules={[{ required: true, message: 'Please enter overtime rate' }]}
+                >
+                  <InputNumber
+                    min={1}
+                    step={0.5}
+                    style={{ width: '100%' }}
+                    formatter={value => `${value}x`}
+                    parser={value => value.replace('x', '')}
+                  />
+                </Form.Item>
+              </Card>
+            </Col>
+
+            {/* Email Notifications */}
+            {/* <Col xs={24}>
+              <Card title="Email Notifications" bordered={false}>
+                <Row gutter={[24, 16]}>
+                  <Col xs={24} md={8}>
+                    <Form.Item
+                      name={['emailNotifications', 'leaveRequests']}
+                      valuePropName="checked"
+                      label="Leave Requests"
+                    >
+                      <Switch />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={8}>
+                    <Form.Item
+                      name={['emailNotifications', 'payrollGeneration']}
+                      valuePropName="checked"
+                      label="Payroll Generation"
+                    >
+                      <Switch />
+                    </Form.Item>
+                  </Col>
+                  <Col xs={24} md={8}>
+                    <Form.Item
+                      name={['emailNotifications', 'attendanceAlerts']}
+                      valuePropName="checked"
+                      label="Attendance Alerts"
+                    >
+                      <Switch />
+                    </Form.Item>
+                  </Col>
+                </Row>
+              </Card>
+            </Col> */}
+          </Row>
+
+          <div style={{ marginTop: 24, textAlign: 'right' }}>
+            <Button type="primary" htmlType="submit" loading={loading}>
+              Save Settings
+            </Button>
+          </div>
+        </Form>
+      </Space>
+    </div>
   );
 };
 

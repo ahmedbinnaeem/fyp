@@ -124,7 +124,7 @@ const deleteProject = async (req, res) => {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    await project.remove();
+    await project.deleteOne();
     res.json({ message: 'Project removed' });
   } catch (error) {
     res.status(500).json({ message: error.message });

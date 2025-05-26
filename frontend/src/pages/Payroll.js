@@ -1,31 +1,36 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  Box,
-  Typography,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Button,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  CircularProgress,
-  MenuItem,
-  Grid,
   Card,
-  CardContent,
+  Table,
+  Button,
+  Space,
+  Modal,
+  Form,
+  Input,
+  Select,
+  Typography,
+  Spin,
+  Alert,
+  DatePicker,
+  Row,
+  Col,
+  Statistic,
+  message,
   Divider,
-} from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import DownloadIcon from '@mui/icons-material/Download';
+  InputNumber,
+} from 'antd';
+import {
+  EditOutlined,
+  DownloadOutlined,
+  PlusOutlined,
+  DollarOutlined,
+  CalendarOutlined,
+} from '@ant-design/icons';
 import api from '../utils/axios';
+import dayjs from 'dayjs';
+
+const { Title } = Typography;
+const { Option } = Select;
 
 const months = [
   'January',
@@ -46,27 +51,11 @@ const Payroll = () => {
   const [payrolls, setPayrolls] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [openDialog, setOpenDialog] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
   const [selectedPayroll, setSelectedPayroll] = useState(null);
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [employees, setEmployees] = useState([]);
-  const [formData, setFormData] = useState({
-    employee: '',
-    basicSalary: '',
-    allowances: {
-      housing: '',
-      transport: '',
-      meal: '',
-      other: ''
-    },
-    deductions: {
-      tax: '',
-      insurance: '',
-      other: ''
-    },
-    month: '',
-    year: '',
-  });
+  const [form] = Form.useForm();
 
   const fetchPayrolls = useCallback(async () => {
     try {
@@ -77,6 +66,7 @@ const Payroll = () => {
       setPayrolls(response.data);
       setError(null);
     } catch (err) {
+      message.error(err.response?.data?.message || 'Failed to fetch payrolls');
       setError(err.response?.data?.message || 'Failed to fetch payrolls');
     } finally {
       setLoading(false);
@@ -88,7 +78,7 @@ const Payroll = () => {
       const response = await api.get('/users');
       setEmployees(response.data);
     } catch (err) {
-      console.error('Failed to fetch employees:', err);
+      message.error('Failed to fetch employees');
     }
   };
 
@@ -97,113 +87,66 @@ const Payroll = () => {
     fetchEmployees();
   }, [fetchPayrolls]);
 
-  const handleOpenDialog = (payroll = null) => {
+  const handleOpenModal = (payroll = null) => {
+    setSelectedPayroll(payroll);
     if (payroll) {
-      setFormData({
+      form.setFieldsValue({
         employee: payroll.employee._id,
         basicSalary: payroll.basicSalary,
-        allowances: {
-          housing: payroll.allowances.housing || '',
-          transport: payroll.allowances.transport || '',
-          meal: payroll.allowances.meal || '',
-          other: payroll.allowances.other || ''
-        },
-        deductions: {
-          tax: payroll.deductions.tax || '',
-          insurance: payroll.deductions.insurance || '',
-          other: payroll.deductions.other || ''
-        },
+        'allowances.housing': payroll.allowances.housing || '',
+        'allowances.transport': payroll.allowances.transport || '',
+        'allowances.meal': payroll.allowances.meal || '',
+        'allowances.other': payroll.allowances.other || '',
+        'deductions.tax': payroll.deductions.tax || '',
+        'deductions.insurance': payroll.deductions.insurance || '',
+        'deductions.other': payroll.deductions.other || '',
         month: payroll.month,
         year: payroll.year,
       });
-      setSelectedPayroll(payroll);
     } else {
-      setFormData({
-        employee: '',
-        basicSalary: '',
-        allowances: {
-          housing: '',
-          transport: '',
-          meal: '',
-          other: ''
-        },
-        deductions: {
-          tax: '',
-          insurance: '',
-          other: ''
-        },
+      form.resetFields();
+      form.setFieldsValue({
         month: selectedMonth.getMonth() + 1,
         year: selectedMonth.getFullYear(),
       });
-      setSelectedPayroll(null);
     }
-    setOpenDialog(true);
+    setModalVisible(true);
   };
 
-  const handleCloseDialog = () => {
-    setOpenDialog(false);
+  const handleCloseModal = () => {
+    setModalVisible(false);
     setSelectedPayroll(null);
-    setFormData({
-      employee: '',
-      basicSalary: '',
-      allowances: {
-        housing: '',
-        transport: '',
-        meal: '',
-        other: ''
-      },
-      deductions: {
-        tax: '',
-        insurance: '',
-        other: ''
-      },
-      month: '',
-      year: '',
-    });
+    form.resetFields();
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    if (name.includes('.')) {
-      const [category, field] = name.split('.');
-      setFormData((prev) => ({
-        ...prev,
-        [category]: {
-          ...prev[category],
-          [field]: value
-        }
-      }));
-    } else {
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-    }
-  };
-
-  const handleSubmit = async () => {
+  const handleSubmit = async (values) => {
     try {
       const payload = {
-        ...formData,
-        allowances: Object.entries(formData.allowances).reduce((acc, [key, value]) => {
-          acc[key] = Number(value) || 0;
-          return acc;
-        }, {}),
-        deductions: Object.entries(formData.deductions).reduce((acc, [key, value]) => {
-          acc[key] = Number(value) || 0;
-          return acc;
-        }, {})
+        ...values,
+        allowances: {
+          housing: Number(values['allowances.housing']) || 0,
+          transport: Number(values['allowances.transport']) || 0,
+          meal: Number(values['allowances.meal']) || 0,
+          other: Number(values['allowances.other']) || 0,
+        },
+        deductions: {
+          tax: Number(values['deductions.tax']) || 0,
+          insurance: Number(values['deductions.insurance']) || 0,
+          other: Number(values['deductions.other']) || 0,
+        },
       };
 
       if (selectedPayroll) {
         await api.put(`/payroll/${selectedPayroll._id}`, payload);
+        message.success('Payroll updated successfully');
       } else {
         await api.post('/payroll', payload);
+        message.success('Payroll created successfully');
       }
-      handleCloseDialog();
+      handleCloseModal();
       fetchPayrolls();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save payroll');
+      message.error(err.response?.data?.message || 'Failed to save payroll');
     }
   };
 
@@ -213,9 +156,10 @@ const Payroll = () => {
         month: selectedMonth.getMonth() + 1,
         year: selectedMonth.getFullYear(),
       });
+      message.success('Payroll generated successfully');
       fetchPayrolls();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to generate payroll');
+      message.error(err.response?.data?.message || 'Failed to generate payroll');
     }
   };
 
@@ -231,8 +175,9 @@ const Payroll = () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
+      message.success('Payslip downloaded successfully');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to download payslip');
+      message.error(err.response?.data?.message || 'Failed to download payslip');
     }
   };
 
@@ -244,271 +189,266 @@ const Payroll = () => {
     return Object.values(deductions).reduce((sum, value) => sum + (Number(value) || 0), 0);
   };
 
+  const columns = [
+    {
+      title: 'Employee',
+      key: 'employee',
+      render: (_, record) => `${record.employee.firstName} ${record.employee.lastName}`,
+    },
+    {
+      title: 'Basic Salary',
+      dataIndex: 'basicSalary',
+      key: 'basicSalary',
+      render: (value) => `$${value.toLocaleString()}`,
+    },
+    {
+      title: 'Total Allowances',
+      key: 'allowances',
+      render: (_, record) => `$${calculateTotalAllowances(record.allowances).toLocaleString()}`,
+    },
+    {
+      title: 'Total Deductions',
+      key: 'deductions',
+      render: (_, record) => `$${calculateTotalDeductions(record.deductions).toLocaleString()}`,
+    },
+    {
+      title: 'Net Salary',
+      key: 'netSalary',
+      render: (_, record) => {
+        const netSalary = record.basicSalary +
+          calculateTotalAllowances(record.allowances) -
+          calculateTotalDeductions(record.deductions);
+        return `$${netSalary.toLocaleString()}`;
+      },
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_, record) => (
+        <Space>
+          <Button
+            type="link"
+            icon={<EditOutlined />}
+            onClick={() => handleOpenModal(record)}
+          />
+          <Button
+            type="link"
+            icon={<DownloadOutlined />}
+            onClick={() => handleDownloadPayslip(record._id)}
+          />
+        </Space>
+      ),
+    },
+  ];
+
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
-        <CircularProgress />
-      </Box>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <Spin size="large" />
+      </div>
     );
   }
 
   if (error) {
-    return (
-      <Box>
-        <Typography color="error">{error}</Typography>
-      </Box>
-    );
+    return <Alert message={error} type="error" showIcon />;
   }
 
-  const totalPayroll = payrolls.reduce(
-    (sum, payroll) =>
-      sum + (payroll.basicSalary + calculateTotalAllowances(payroll.allowances) - calculateTotalDeductions(payroll.deductions)),
-    0
-  );
-
   return (
-    <Box>
-      <Typography variant="h4" gutterBottom>
-        Payroll Management
-      </Typography>
+    <div style={{ padding: 24 }}>
+      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Title level={2}>Payroll Management</Title>
+          <Space>
+            <DatePicker
+              picker="month"
+              value={dayjs(selectedMonth)}
+              onChange={(date) => setSelectedMonth(date.toDate())}
+              allowClear={false}
+            />
+            <Button type="primary" onClick={handleGeneratePayroll}>
+              Generate Payroll
+            </Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => handleOpenModal()}>
+              Add Payroll
+            </Button>
+          </Space>
+        </div>
 
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} md={4}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Total Payroll
-              </Typography>
-              <Typography variant="h4">${totalPayroll.toLocaleString()}</Typography>
-              <Typography variant="subtitle2" color="textSecondary">
-                For {months[selectedMonth.getMonth()]} {selectedMonth.getFullYear()}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+        <Row gutter={16}>
+          <Col span={8}>
+            <Card>
+              <Statistic
+                title="Total Payroll"
+                value={payrolls.reduce((sum, p) => sum + p.basicSalary, 0)}
+                prefix={<DollarOutlined />}
+                precision={2}
+              />
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card>
+              <Statistic
+                title="Total Employees"
+                value={payrolls.length}
+                prefix={<CalendarOutlined />}
+              />
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card>
+              <Statistic
+                title="Average Salary"
+                value={payrolls.length ? payrolls.reduce((sum, p) => sum + p.basicSalary, 0) / payrolls.length : 0}
+                prefix={<DollarOutlined />}
+                precision={2}
+              />
+            </Card>
+          </Col>
+        </Row>
 
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <TextField
-          type="month"
-          label="Select Month"
-          value={`${selectedMonth.getFullYear()}-${String(selectedMonth.getMonth() + 1).padStart(2, '0')}`}
-          onChange={(e) => {
-            const [year, month] = e.target.value.split('-');
-            setSelectedMonth(new Date(year, parseInt(month) - 1));
-          }}
-          InputLabelProps={{ shrink: true }}
-        />
-        <Box>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleGeneratePayroll}
-            sx={{ mr: 2 }}
+        <Card>
+          <Table
+            columns={columns}
+            dataSource={payrolls}
+            rowKey="_id"
+            scroll={{ x: true }}
+          />
+        </Card>
+
+        <Modal
+          title={selectedPayroll ? 'Edit Payroll' : 'New Payroll'}
+          open={modalVisible}
+          onCancel={handleCloseModal}
+          footer={null}
+          width={800}
+        >
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={handleSubmit}
           >
-            Generate Payroll
-          </Button>
-          <Button
-            variant="contained"
-            color="secondary"
-            onClick={() => handleOpenDialog()}
-          >
-            Add Manual Entry
-          </Button>
-        </Box>
-      </Box>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  name="employee"
+                  label="Employee"
+                  rules={[{ required: true, message: 'Please select an employee' }]}
+                >
+                  <Select>
+                    {employees.map((emp) => (
+                      <Option key={emp._id} value={emp._id}>
+                        {emp.firstName} {emp.lastName}
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  name="basicSalary"
+                  label="Basic Salary"
+                  rules={[{ required: true, message: 'Please enter basic salary' }]}
+                >
+                  <InputNumber
+                    style={{ width: '100%' }}
+                    formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Employee</TableCell>
-              <TableCell>Basic Salary</TableCell>
-              <TableCell>Total Allowances</TableCell>
-              <TableCell>Total Deductions</TableCell>
-              <TableCell>Net Salary</TableCell>
-              <TableCell align="right">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {payrolls.map((payroll) => (
-              <TableRow key={payroll._id}>
-                <TableCell>
-                  {payroll.employee.firstName} {payroll.employee.lastName}
-                </TableCell>
-                <TableCell>${payroll.basicSalary.toLocaleString()}</TableCell>
-                <TableCell>${calculateTotalAllowances(payroll.allowances).toLocaleString()}</TableCell>
-                <TableCell>${calculateTotalDeductions(payroll.deductions).toLocaleString()}</TableCell>
-                <TableCell>
-                  $
-                  {(
-                    payroll.basicSalary +
-                    calculateTotalAllowances(payroll.allowances) -
-                    calculateTotalDeductions(payroll.deductions)
-                  ).toLocaleString()}
-                </TableCell>
-                <TableCell align="right">
-                  <IconButton
-                    onClick={() => handleOpenDialog(payroll)}
-                    color="primary"
-                  >
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton
-                    onClick={() => handleDownloadPayslip(payroll._id)}
-                    color="secondary"
-                  >
-                    <DownloadIcon />
-                  </IconButton>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            <Divider>Allowances</Divider>
 
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {selectedPayroll ? 'Edit Payroll Entry' : 'Add Payroll Entry'}
-        </DialogTitle>
-        <DialogContent>
-          <Box display="flex" flexDirection="column" gap={2} mt={2}>
-            <TextField
-              name="employee"
-              label="Employee"
-              select
-              value={formData.employee}
-              onChange={handleInputChange}
-              fullWidth
-            >
-              {employees.map((employee) => (
-                <MenuItem key={employee._id} value={employee._id}>
-                  {employee.firstName} {employee.lastName}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              name="basicSalary"
-              label="Basic Salary"
-              type="number"
-              value={formData.basicSalary}
-              onChange={handleInputChange}
-              fullWidth
-              InputProps={{
-                startAdornment: '$',
-              }}
-            />
-            <Typography variant="subtitle1" color="primary" sx={{ mt: 2 }}>
-              Allowances
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={6}>
-                <TextField
-                  name="allowances.housing"
-                  label="Housing Allowance"
-                  type="number"
-                  value={formData.allowances.housing}
-                  onChange={handleInputChange}
-                  fullWidth
-                  InputProps={{
-                    startAdornment: '$',
-                  }}
-                />
-              </Grid>
-              <Grid item xs={6}>
-                <TextField
-                  name="allowances.transport"
-                  label="Transport Allowance"
-                  type="number"
-                  value={formData.allowances.transport}
-                  onChange={handleInputChange}
-                  fullWidth
-                  InputProps={{
-                    startAdornment: '$',
-                  }}
-                />
-              </Grid>
-              <Grid item xs={6}>
-                <TextField
-                  name="allowances.meal"
-                  label="Meal Allowance"
-                  type="number"
-                  value={formData.allowances.meal}
-                  onChange={handleInputChange}
-                  fullWidth
-                  InputProps={{
-                    startAdornment: '$',
-                  }}
-                />
-              </Grid>
-              <Grid item xs={6}>
-                <TextField
-                  name="allowances.other"
-                  label="Other Allowances"
-                  type="number"
-                  value={formData.allowances.other}
-                  onChange={handleInputChange}
-                  fullWidth
-                  InputProps={{
-                    startAdornment: '$',
-                  }}
-                />
-              </Grid>
-            </Grid>
-            <Typography variant="subtitle1" color="primary" sx={{ mt: 2 }}>
-              Deductions
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={6}>
-                <TextField
-                  name="deductions.tax"
-                  label="Tax"
-                  type="number"
-                  value={formData.deductions.tax}
-                  onChange={handleInputChange}
-                  fullWidth
-                  InputProps={{
-                    startAdornment: '$',
-                  }}
-                />
-              </Grid>
-              <Grid item xs={6}>
-            <TextField
-                  name="deductions.insurance"
-                  label="Insurance"
-              type="number"
-                  value={formData.deductions.insurance}
-              onChange={handleInputChange}
-              fullWidth
-              InputProps={{
-                startAdornment: '$',
-              }}
-            />
-              </Grid>
-              <Grid item xs={12}>
-            <TextField
-                  name="deductions.other"
-                  label="Other Deductions"
-              type="number"
-                  value={formData.deductions.other}
-              onChange={handleInputChange}
-              fullWidth
-              InputProps={{
-                startAdornment: '$',
-              }}
-            />
-              </Grid>
-            </Grid>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained" color="primary">
-            {selectedPayroll ? 'Update' : 'Add'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item name="allowances.housing" label="Housing Allowance">
+                  <InputNumber
+                    style={{ width: '100%' }}
+                    formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name="allowances.transport" label="Transport Allowance">
+                  <InputNumber
+                    style={{ width: '100%' }}
+                    formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item name="allowances.meal" label="Meal Allowance">
+                  <InputNumber
+                    style={{ width: '100%' }}
+                    formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name="allowances.other" label="Other Allowances">
+                  <InputNumber
+                    style={{ width: '100%' }}
+                    formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Divider>Deductions</Divider>
+
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item name="deductions.tax" label="Tax">
+                  <InputNumber
+                    style={{ width: '100%' }}
+                    formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name="deductions.insurance" label="Insurance">
+                  <InputNumber
+                    style={{ width: '100%' }}
+                    formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={24}>
+                <Form.Item name="deductions.other" label="Other Deductions">
+                  <InputNumber
+                    style={{ width: '100%' }}
+                    formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Form.Item>
+              <Space>
+                <Button type="primary" htmlType="submit">
+                  {selectedPayroll ? 'Update' : 'Create'}
+                </Button>
+                <Button onClick={handleCloseModal}>Cancel</Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        </Modal>
+      </Space>
+    </div>
   );
 };
 

@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { CircularProgress, Box } from '@mui/material';
+import { Spin } from 'antd';
+import { LoadingOutlined } from '@ant-design/icons';
 import Layout from './components/layout/Layout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -16,6 +17,8 @@ import Unauthorized from './pages/Unauthorized';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { getUserProfile } from './store/slices/authSlice';
 
+const antIcon = <LoadingOutlined style={{ fontSize: 24 }} spin />;
+
 function App() {
   const dispatch = useDispatch();
   const { user, token, loading } = useSelector((state) => state.auth);
@@ -29,9 +32,14 @@ function App() {
   const RootRedirect = () => {
     if (loading || (token && !user)) {
       return (
-        <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
-          <CircularProgress />
-        </Box>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          minHeight: '100vh' 
+        }}>
+          <Spin indicator={antIcon} />
+        </div>
       );
     }
 
@@ -48,19 +56,19 @@ function App() {
 
   return (
     <Router>
-    <Routes>
+      <Routes>
         {/* Public route */}
-      <Route path="/login" element={<Login />} />
+        <Route path="/login" element={<Login />} />
         
         {/* Protected routes */}
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }
-      >
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }
+        >
           {/* Root path redirect */}
           <Route index element={<RootRedirect />} />
 
@@ -73,30 +81,30 @@ function App() {
               </ProtectedRoute>
             }
           />
-        <Route
-          path="employees"
-          element={
+          <Route
+            path="employees"
+            element={
               <ProtectedRoute roles={['admin']}>
-              <Employees />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="payroll"
-          element={
+                <Employees />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="payroll"
+            element={
               <ProtectedRoute roles={['admin']}>
-              <Payroll />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="settings"
-          element={
+                <Payroll />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="settings"
+            element={
               <ProtectedRoute roles={['admin']}>
-              <Settings />
-            </ProtectedRoute>
-          }
-        />
+                <Settings />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Routes accessible by all authenticated users */}
           <Route
@@ -132,9 +140,9 @@ function App() {
             }
           />
           <Route path="unauthorized" element={<Unauthorized />} />
-      </Route>
-    </Routes>
-      </Router>
+        </Route>
+      </Routes>
+    </Router>
   );
 }
 

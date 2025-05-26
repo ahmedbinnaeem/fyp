@@ -1,92 +1,72 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect } from 'react';
 import {
-  Box,
-  Typography,
-  Paper,
+  Card,
   Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Button,
-  CircularProgress,
+  Typography,
+  Space,
+  Tag,
+  Spin,
   Alert,
-  Chip,
-  Stack,
-} from '@mui/material';
-import axios from '../../utils/axios';
+  Row,
+  Col,
+  Statistic,
+  Empty,
+} from 'antd';
+import {
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  CloseCircleOutlined,
+  LoginOutlined,
+  LogoutOutlined,
+} from '@ant-design/icons';
+import { useDispatch, useSelector } from 'react-redux';
+import dayjs from 'dayjs';
+import { fetchAttendance, clockIn, clockOut } from '../../store/slices/attendanceSlice';
+
+const { Title } = Typography;
 
 const EmployeeAttendance = () => {
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [attendanceData, setAttendanceData] = useState({
-    attendances: [],
-    todayStatus: {
-      isClockedIn: false,
-      isClockedOut: false,
-      attendance: null,
-    },
-  });
-
-  const fetchAttendance = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await axios.get('/attendance/my-attendance');
-      setAttendanceData(response.data);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to fetch attendance records');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const dispatch = useDispatch();
+  const { attendanceRecords, isLoading, error, clockInStatus } = useSelector((state) => state.attendance);
 
   useEffect(() => {
-    fetchAttendance();
-  }, [fetchAttendance]);
+    const startDate = dayjs().startOf('month').format('YYYY-MM-DD');
+    const endDate = dayjs().endOf('month').format('YYYY-MM-DD');
+    dispatch(fetchAttendance({ startDate, endDate }));
+  }, [dispatch]);
 
   const handleClockIn = async () => {
     try {
-      setError(null);
-      await axios.post('/attendance/clock-in');
-      fetchAttendance();
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to clock in');
+      await dispatch(clockIn()).unwrap();
+      dispatch(fetchAttendance({
+        startDate: dayjs().startOf('month').format('YYYY-MM-DD'),
+        endDate: dayjs().endOf('month').format('YYYY-MM-DD')
+      }));
+    } catch (error) {
+      // Error is handled by the reducer
     }
   };
 
   const handleClockOut = async () => {
     try {
-      setError(null);
-      await axios.post('/attendance/clock-out');
-      fetchAttendance();
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to clock out');
+      await dispatch(clockOut()).unwrap();
+      dispatch(fetchAttendance({
+        startDate: dayjs().startOf('month').format('YYYY-MM-DD'),
+        endDate: dayjs().endOf('month').format('YYYY-MM-DD')
+      }));
+    } catch (error) {
+      // Error is handled by the reducer
     }
   };
 
   const formatTime = (date) => {
-    return new Date(date).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    if (!date) return 'Not Recorded';
+    return dayjs(date).format('hh:mm A');
   };
 
   const formatWorkingHours = (workingHours) => {
     if (!workingHours) return '-';
-    
-    // Handle old format (decimal number)
-    if (typeof workingHours === 'number') {
-      const hours = Math.floor(workingHours);
-      const minutes = Math.round((workingHours - hours) * 60);
-      if (hours === 0 && minutes === 0) return '-';
-      if (hours === 0) return `${minutes}m`;
-      if (minutes === 0) return `${hours}h`;
-      return `${hours}h ${minutes}m`;
-    }
-
-    // Handle new format (object with hours and minutes)
     const { hours, minutes } = workingHours;
     if (hours === 0 && minutes === 0) return '-';
     if (hours === 0) return `${minutes}m`;
@@ -94,155 +74,152 @@ const EmployeeAttendance = () => {
     return `${hours}h ${minutes}m`;
   };
 
-  if (loading) {
+  const getStatusTag = (status) => {
+    const config = {
+      present: { color: 'success', icon: <CheckCircleOutlined /> },
+      late: { color: 'warning', icon: <ClockCircleOutlined /> },
+      absent: { color: 'error', icon: <CloseCircleOutlined /> },
+    };
+
+    const { color, icon } = config[status] || { color: 'default', icon: null };
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <CircularProgress />
-      </Box>
+      <Tag color={color} icon={icon}>
+        {status.toUpperCase()}
+      </Tag>
+    );
+  };
+
+  const columns = [
+    {
+      title: 'Date',
+      dataIndex: 'date',
+      key: 'date',
+      render: (date) => dayjs(date).format('MM/DD/YYYY'),
+    },
+    {
+      title: 'Clock In',
+      key: 'clockIn',
+      render: (_, record) => formatTime(record.checkIn?.time),
+    },
+    {
+      title: 'Clock Out',
+      key: 'clockOut',
+      render: (_, record) => formatTime(record.checkOut?.time),
+    },
+    {
+      title: 'Working Hours',
+      key: 'workingHours',
+      render: (_, record) => formatWorkingHours(record.workingHours),
+    },
+    {
+      title: 'Status',
+      key: 'status',
+      render: (_, record) => getStatusTag(record.status),
+    },
+  ];
+
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <Spin size="large" />
+      </div>
     );
   }
 
-  if (error) {
-    return (
-      <Box m={2}>
-        <Alert severity="error">{error}</Alert>
-      </Box>
-    );
-  }
+  const todayAttendance = clockInStatus.todayAttendance;
 
   return (
-    <Box>
-      <Typography variant="h4" sx={{ mb: 4 }}>
-        My Attendance
-      </Typography>
+    <div style={{ padding: 24 }}>
+      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <Title level={2}>My Attendance</Title>
 
-      <Paper sx={{ p: 3, mb: 4 }}>
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          Today's Status
-        </Typography>
-        <Stack direction="row" spacing={2} alignItems="center">
-          <Box>
-            <Typography variant="body1" color="text.secondary">
-              Status:
-            </Typography>
-            <Chip
-              label={
-                attendanceData.todayStatus.isClockedIn
-                  ? attendanceData.todayStatus.isClockedOut
-                    ? 'Completed'
-                    : 'In Progress'
-                  : 'Not Started'
-              }
-              color={
-                attendanceData.todayStatus.isClockedIn
-                  ? attendanceData.todayStatus.isClockedOut
-                    ? 'success'
-                    : 'primary'
-                  : 'default'
-              }
-            />
-          </Box>
-          {attendanceData.todayStatus.attendance && (
-            <Box>
-              <Typography variant="body1" color="text.secondary">
-                Clock In:
-              </Typography>
-              <Typography>
-                {formatTime(attendanceData.todayStatus.attendance.checkIn.time)}
-              </Typography>
-            </Box>
-          )}
-          {attendanceData.todayStatus.attendance?.checkOut?.time && (
-            <Box>
-              <Typography variant="body1" color="text.secondary">
-                Clock Out:
-              </Typography>
-              <Typography>
-                {formatTime(attendanceData.todayStatus.attendance.checkOut.time)}
-              </Typography>
-            </Box>
-          )}
-          {attendanceData.todayStatus.attendance?.workingHours && (
-            <Box>
-              <Typography variant="body1" color="text.secondary">
-                Working Hours:
-              </Typography>
-              <Typography>
-                {formatWorkingHours(attendanceData.todayStatus.attendance.workingHours)}
-              </Typography>
-            </Box>
-          )}
-          <Box sx={{ ml: 'auto' }}>
-            {!attendanceData.todayStatus.isClockedIn ? (
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={handleClockIn}
-              >
-                Clock In
-              </Button>
-            ) : !attendanceData.todayStatus.isClockedOut ? (
-              <Button
-                variant="contained"
-                color="secondary"
-                onClick={handleClockOut}
-              >
-                Clock Out
-              </Button>
-            ) : null}
-          </Box>
-        </Stack>
-      </Paper>
+        {error && <Alert message={error} type="error" showIcon style={{ marginBottom: 16 }} />}
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Date</TableCell>
-              <TableCell>Clock In</TableCell>
-              <TableCell>Clock Out</TableCell>
-              <TableCell>Working Hours</TableCell>
-              <TableCell>Status</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {attendanceData.attendances.map((record) => (
-              <TableRow key={record._id}>
-                <TableCell>
-                  {new Date(record.date).toLocaleDateString()}
-                </TableCell>
-                <TableCell>
-                  {record.checkIn?.time
-                    ? formatTime(record.checkIn.time)
-                    : 'Not Recorded'}
-                </TableCell>
-                <TableCell>
-                  {record.checkOut?.time
-                    ? formatTime(record.checkOut.time)
-                    : 'Not Recorded'}
-                </TableCell>
-                <TableCell>
-                  {formatWorkingHours(record.workingHours)}
-                </TableCell>
-                <TableCell>
-                  <Chip
-                    label={record.status}
-                    color={
-                      record.status === 'present'
-                        ? 'success'
-                        : record.status === 'late'
-                        ? 'warning'
-                        : 'error'
-                    }
-                    size="small"
-                  />
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </Box>
+        <Card title="Today's Status">
+          <Row gutter={[24, 24]} align="middle">
+            <Col xs={24} sm={6}>
+              <Statistic
+                title="Status"
+                value={
+                  clockInStatus.isClockedIn
+                    ? clockInStatus.isClockedOut
+                      ? 'Completed'
+                      : 'In Progress'
+                    : 'Not Started'
+                }
+                valueStyle={{
+                  color: clockInStatus.isClockedIn
+                    ? clockInStatus.isClockedOut
+                      ? '#52c41a'
+                      : '#1890ff'
+                    : '#8c8c8c',
+                }}
+              />
+            </Col>
+            {todayAttendance?.checkIn && (
+              <Col xs={24} sm={6}>
+                <Statistic
+                  title="Clock In"
+                  value={formatTime(todayAttendance.checkIn.time)}
+                />
+              </Col>
+            )}
+            {todayAttendance?.checkOut?.time && (
+              <Col xs={24} sm={6}>
+                <Statistic
+                  title="Clock Out"
+                  value={formatTime(todayAttendance.checkOut.time)}
+                />
+              </Col>
+            )}
+            {todayAttendance?.workingHours && (
+              <Col xs={24} sm={6}>
+                <Statistic
+                  title="Working Hours"
+                  value={formatWorkingHours(todayAttendance.workingHours)}
+                />
+              </Col>
+            )}
+            <Col xs={24}>
+              <Space>
+                {!clockInStatus.isClockedIn ? (
+                  <Button
+                    type="primary"
+                    icon={<LoginOutlined />}
+                    onClick={handleClockIn}
+                    loading={clockInStatus.isLoading}
+                  >
+                    Clock In
+                  </Button>
+                ) : !clockInStatus.isClockedOut ? (
+                  <Button
+                    type="primary"
+                    danger
+                    icon={<LogoutOutlined />}
+                    onClick={handleClockOut}
+                    loading={clockInStatus.isLoading}
+                  >
+                    Clock Out
+                  </Button>
+                ) : null}
+              </Space>
+            </Col>
+          </Row>
+        </Card>
+
+        <Card>
+          <Table
+            columns={columns}
+            dataSource={attendanceRecords}
+            rowKey="_id"
+            locale={{
+              emptyText: <Empty description="No attendance records found" />,
+            }}
+            scroll={{ x: true }}
+          />
+        </Card>
+      </Space>
+    </div>
   );
 };
 

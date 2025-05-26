@@ -1,42 +1,34 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Box,
-  Typography,
-  Paper,
+  Card,
   Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Button,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  CircularProgress,
-} from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import AddIcon from '@mui/icons-material/Add';
+  Space,
+  Modal,
+  Form,
+  Input,
+  Typography,
+  Spin,
+  Alert,
+  Popconfirm,
+  message,
+} from 'antd';
+import {
+  EditOutlined,
+  DeleteOutlined,
+  PlusOutlined,
+} from '@ant-design/icons';
 import api from '../utils/axios';
+
+const { Title } = Typography;
 
 const Employees = () => {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [openDialog, setOpenDialog] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    position: '',
-    department: '',
-    password: '',
-  });
+  const [form] = Form.useForm();
 
   const fetchEmployees = async () => {
     try {
@@ -45,6 +37,7 @@ const Employees = () => {
       setEmployees(response.data);
       setError(null);
     } catch (err) {
+      message.error(err.response?.data?.message || 'Failed to fetch employees');
       setError(err.response?.data?.message || 'Failed to fetch employees');
     } finally {
       setLoading(false);
@@ -55,191 +48,213 @@ const Employees = () => {
     fetchEmployees();
   }, []);
 
-  const handleOpenDialog = (employee = null) => {
+  const handleOpenModal = (employee = null) => {
+    setSelectedEmployee(employee);
     if (employee) {
-      setFormData(employee);
-      setSelectedEmployee(employee);
-    } else {
-      setFormData({
-        firstName: '',
-        lastName: '',
-        email: '',
-        position: '',
-        department: '',
+      form.setFieldsValue({
+        firstName: employee.firstName,
+        lastName: employee.lastName,
+        email: employee.email,
+        position: employee.position,
+        department: employee.department,
       });
-      setSelectedEmployee(null);
+    } else {
+      form.resetFields();
     }
-    setOpenDialog(true);
+    setModalVisible(true);
   };
 
-  const handleCloseDialog = () => {
-    setOpenDialog(false);
+  const handleCloseModal = () => {
+    setModalVisible(false);
     setSelectedEmployee(null);
-    setFormData({
-      firstName: '',
-      lastName: '',
-      email: '',
-      position: '',
-      department: '',
-    });
+    form.resetFields();
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleSubmit = async () => {
+  const handleSubmit = async (values) => {
     try {
       if (selectedEmployee) {
-        await api.put(`/users/${selectedEmployee._id}`, formData);
+        await api.put(`/users/${selectedEmployee._id}`, values);
+        message.success('Employee updated successfully');
       } else {
-        await api.post('/users', formData);
+        await api.post('/users', values);
+        message.success('Employee added successfully');
       }
-      handleCloseDialog();
+      handleCloseModal();
       fetchEmployees();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save employee');
+      message.error(err.response?.data?.message || 'Failed to save employee');
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this employee?')) {
-      try {
-        await api.delete(`/users/${id}`);
-        fetchEmployees();
-      } catch (err) {
-        setError(err.response?.data?.message || 'Failed to delete employee');
-      }
+    try {
+      await api.delete(`/users/${id}`);
+      message.success('Employee deleted successfully');
+      fetchEmployees();
+    } catch (err) {
+      message.error(err.response?.data?.message || 'Failed to delete employee');
     }
   };
 
+  const columns = [
+    {
+      title: 'Name',
+      key: 'name',
+      render: (_, record) => `${record.firstName} ${record.lastName}`,
+    },
+    {
+      title: 'Email',
+      dataIndex: 'email',
+      key: 'email',
+    },
+    {
+      title: 'Position',
+      dataIndex: 'position',
+      key: 'position',
+    },
+    {
+      title: 'Department',
+      dataIndex: 'department',
+      key: 'department',
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_, record) => (
+        <Space>
+          <Button
+            type="link"
+            icon={<EditOutlined />}
+            onClick={() => handleOpenModal(record)}
+          />
+          <Popconfirm
+            title="Are you sure you want to delete this employee?"
+            onConfirm={() => handleDelete(record._id)}
+            okText="Yes"
+            cancelText="No"
+          >
+            <Button type="link" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
-        <CircularProgress />
-      </Box>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <Spin size="large" />
+      </div>
     );
   }
 
   if (error) {
-    return (
-      <Box>
-        <Typography color="error">{error}</Typography>
-      </Box>
-    );
+    return <Alert message={error} type="error" showIcon />;
   }
 
   return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4">Employees Management</Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
+    <div style={{ padding: 24 }}>
+      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Title level={2}>Employees Management</Title>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => handleOpenModal()}
+          >
+            Add Employee
+          </Button>
+        </div>
+
+        <Card>
+          <Table
+            columns={columns}
+            dataSource={employees}
+            rowKey="_id"
+            scroll={{ x: true }}
+          />
+        </Card>
+
+        <Modal
+          title={selectedEmployee ? 'Edit Employee' : 'New Employee'}
+          open={modalVisible}
+          onCancel={handleCloseModal}
+          footer={null}
+          width={600}
         >
-          Add Employee
-        </Button>
-      </Box>
-
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell>Position</TableCell>
-              <TableCell>Department</TableCell>
-              <TableCell align="right">Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {employees.map((employee) => (
-              <TableRow key={employee._id}>
-                <TableCell>
-                  {employee.firstName} {employee.lastName}
-                </TableCell>
-                <TableCell>{employee.email}</TableCell>
-                <TableCell>{employee.position}</TableCell>
-                <TableCell>{employee.department}</TableCell>
-                <TableCell align="right">
-                  <IconButton onClick={() => handleOpenDialog(employee)} color="primary">
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton onClick={() => handleDelete(employee._id)} color="error">
-                    <DeleteIcon />
-                  </IconButton>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {selectedEmployee ? 'Edit Employee' : 'Add New Employee'}
-        </DialogTitle>
-        <DialogContent>
-          <Box display="flex" flexDirection="column" gap={2} mt={2}>
-            <TextField
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={handleSubmit}
+          >
+            <Form.Item
               name="firstName"
               label="First Name"
-              value={formData.firstName}
-              onChange={handleInputChange}
-              fullWidth
-            />
-            <TextField
+              rules={[{ required: true, message: 'Please enter first name' }]}
+            >
+              <Input />
+            </Form.Item>
+
+            <Form.Item
               name="lastName"
               label="Last Name"
-              value={formData.lastName}
-              onChange={handleInputChange}
-              fullWidth
-            />
-            <TextField
+              rules={[{ required: true, message: 'Please enter last name' }]}
+            >
+              <Input />
+            </Form.Item>
+
+            <Form.Item
               name="email"
               label="Email"
-              type="email"
-              value={formData.email}
-              onChange={handleInputChange}
-              fullWidth
-            />
-            <TextField
+              rules={[
+                { required: true, message: 'Please enter email' },
+                { type: 'email', message: 'Please enter a valid email' },
+              ]}
+            >
+              <Input />
+            </Form.Item>
+
+            <Form.Item
               name="position"
               label="Position"
-              value={formData.position}
-              onChange={handleInputChange}
-              fullWidth
-            />
-            <TextField
+              rules={[{ required: true, message: 'Please enter position' }]}
+            >
+              <Input />
+            </Form.Item>
+
+            <Form.Item
               name="department"
               label="Department"
-              value={formData.department}
-              onChange={handleInputChange}
-              fullWidth
-            />
-            {!selectedEmployee && <TextField
-              name="password"
-              label="Password"
-              value={formData.password}
-              onChange={handleInputChange}
-              fullWidth
-            />}
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancel</Button>
-          <Button onClick={handleSubmit} variant="contained" color="primary">
-            {selectedEmployee ? 'Update' : 'Add'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+              rules={[{ required: true, message: 'Please enter department' }]}
+            >
+              <Input />
+            </Form.Item>
+
+            {!selectedEmployee && (
+              <Form.Item
+                name="password"
+                label="Password"
+                rules={[
+                  { required: true, message: 'Please enter password' },
+                  { min: 6, message: 'Password must be at least 6 characters' },
+                ]}
+              >
+                <Input.Password />
+              </Form.Item>
+            )}
+
+            <Form.Item>
+              <Space>
+                <Button type="primary" htmlType="submit">
+                  {selectedEmployee ? 'Update' : 'Add'}
+                </Button>
+                <Button onClick={handleCloseModal}>Cancel</Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        </Modal>
+      </Space>
+    </div>
   );
 };
 

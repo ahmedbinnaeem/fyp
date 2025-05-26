@@ -1,8 +1,11 @@
 import React, { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Navigate, useLocation } from 'react-router-dom';
-import { CircularProgress, Box } from '@mui/material';
+import { Spin } from 'antd';
+import { LoadingOutlined } from '@ant-design/icons';
 import { getUserProfile } from '../../store/slices/authSlice';
+
+const antIcon = <LoadingOutlined style={{ fontSize: 24 }} spin />;
 
 const ProtectedRoute = ({ children, roles = [] }) => {
   const location = useLocation();
@@ -15,12 +18,16 @@ const ProtectedRoute = ({ children, roles = [] }) => {
     }
   }, [dispatch, token, user]);
 
-  // Show loading while fetching user data
   if (loading || (token && !user)) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
-        <CircularProgress />
-      </Box>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: '100vh' 
+      }}>
+        <Spin indicator={antIcon} />
+      </div>
     );
   }
 

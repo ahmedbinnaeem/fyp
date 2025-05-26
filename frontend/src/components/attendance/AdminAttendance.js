@@ -1,34 +1,37 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-  Box,
-  Typography,
-  Paper,
+  Card,
   Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  CircularProgress,
+  Typography,
+  DatePicker,
+  Space,
+  Tag,
+  Spin,
   Alert,
-  Chip,
-  TextField,
-  Stack,
-} from '@mui/material';
+  Empty,
+} from 'antd';
+import {
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  CloseCircleOutlined,
+} from '@ant-design/icons';
 import axios from '../../utils/axios';
+import dayjs from 'dayjs';
+
+const { Title } = Typography;
 
 const AdminAttendance = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [attendances, setAttendances] = useState([]);
-  const [dateFilter, setDateFilter] = useState(new Date().toISOString().split('T')[0]);
+  const [dateFilter, setDateFilter] = useState(dayjs());
 
   const fetchAttendances = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const response = await axios.get('/attendance', {
-        params: { date: dateFilter }
+        params: { date: dateFilter.format('YYYY-MM-DD') }
       });
       setAttendances(response.data);
     } catch (err) {
@@ -44,10 +47,7 @@ const AdminAttendance = () => {
 
   const formatTime = (date) => {
     if (!date) return 'Not Recorded';
-    return new Date(date).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return dayjs(date).format('hh:mm A');
   };
 
   const formatWorkingHours = (workingHours) => {
@@ -71,89 +71,91 @@ const AdminAttendance = () => {
     return `${hours}h ${minutes}m`;
   };
 
+  const getStatusTag = (status) => {
+    const config = {
+      present: { color: 'success', icon: <CheckCircleOutlined /> },
+      late: { color: 'warning', icon: <ClockCircleOutlined /> },
+      absent: { color: 'error', icon: <CloseCircleOutlined /> },
+    };
+
+    const { color, icon } = config[status] || { color: 'default', icon: null };
+    return (
+      <Tag color={color} icon={icon}>
+        {status.toUpperCase()}
+      </Tag>
+    );
+  };
+
+  const columns = [
+    {
+      title: 'Employee',
+      key: 'employee',
+      render: (_, record) => `${record.user.firstName} ${record.user.lastName}`,
+    },
+    {
+      title: 'Date',
+      dataIndex: 'date',
+      key: 'date',
+      render: (date) => dayjs(date).format('MM/DD/YYYY'),
+    },
+    {
+      title: 'Clock In',
+      key: 'clockIn',
+      render: (_, record) => formatTime(record.checkIn?.time),
+    },
+    {
+      title: 'Clock Out',
+      key: 'clockOut',
+      render: (_, record) => formatTime(record.checkOut?.time),
+    },
+    {
+      title: 'Working Hours',
+      key: 'workingHours',
+      render: (_, record) => formatWorkingHours(record.workingHours),
+    },
+    {
+      title: 'Status',
+      key: 'status',
+      render: (_, record) => getStatusTag(record.status),
+    },
+  ];
+
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <CircularProgress />
-      </Box>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <Spin size="large" />
+      </div>
     );
   }
 
   return (
-    <Box>
-      <Typography variant="h4" sx={{ mb: 4 }}>
-        Attendance Management
-      </Typography>
+    <div style={{ padding: 24 }}>
+      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+        <Title level={2}>Attendance Management</Title>
 
-      <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 4 }}>
-        <TextField
-          type="date"
-          label="Filter by Date"
-          value={dateFilter}
-          onChange={(e) => setDateFilter(e.target.value)}
-          InputLabelProps={{ shrink: true }}
-        />
-        {error && <Alert severity="error" sx={{ flex: 1 }}>{error}</Alert>}
-      </Stack>
+        <Space>
+          <DatePicker
+            value={dateFilter}
+            onChange={setDateFilter}
+            allowClear={false}
+          />
+          {error && <Alert message={error} type="error" showIcon />}
+        </Space>
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Employee</TableCell>
-              <TableCell>Date</TableCell>
-              <TableCell>Clock In</TableCell>
-              <TableCell>Clock Out</TableCell>
-              <TableCell>Working Hours</TableCell>
-              <TableCell>Status</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {attendances.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} align="center">
-                  No attendance records found for this date
-                </TableCell>
-              </TableRow>
-            ) : (
-              attendances.map((record) => (
-                <TableRow key={record._id}>
-                  <TableCell>
-                    {record.user.firstName} {record.user.lastName}
-                  </TableCell>
-                  <TableCell>
-                    {new Date(record.date).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell>
-                    {formatTime(record.checkIn?.time)}
-                  </TableCell>
-                  <TableCell>
-                    {formatTime(record.checkOut?.time)}
-                  </TableCell>
-                  <TableCell>
-                    {formatWorkingHours(record.workingHours)}
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={record.status}
-                      color={
-                        record.status === 'present'
-                          ? 'success'
-                          : record.status === 'late'
-                          ? 'warning'
-                          : 'error'
-                      }
-                      size="small"
-                    />
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </Box>
+        <Card>
+          <Table
+            columns={columns}
+            dataSource={attendances}
+            rowKey="_id"
+            locale={{
+              emptyText: <Empty description="No attendance records found for this date" />,
+            }}
+            scroll={{ x: true }}
+          />
+        </Card>
+      </Space>
+    </div>
   );
 };
 
-export default AdminAttendance; 
+export default AdminAttendance;

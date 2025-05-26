@@ -1,16 +1,21 @@
 import React, { useState } from 'react';
 import {
-  Box,
-  Paper,
-  Typography,
-  TextField,
+  Form,
+  Input,
   Button,
-  Container,
+  Card,
+  Typography,
+  Layout,
   Alert,
-} from '@mui/material';
+  Space
+} from 'antd';
+import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { login } from '../store/slices/authSlice';
+
+const { Title } = Typography;
+const { Content } = Layout;
 
 const Login = () => {
   const dispatch = useDispatch();
@@ -18,22 +23,9 @@ const Login = () => {
   const location = useLocation();
   const { error, isLoading } = useSelector((state) => state.auth);
 
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
-
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (values) => {
     try {
-      await dispatch(login(formData)).unwrap();
+      await dispatch(login(values)).unwrap();
       const from = location.state?.from?.pathname || '/dashboard';
       navigate(from, { replace: true });
     } catch (err) {
@@ -42,73 +34,80 @@ const Login = () => {
   };
 
   return (
-    <Container component="main" maxWidth="xs">
-      <Box
-        sx={{
-          marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-      >
-        <Paper
-          elevation={3}
-          sx={{
-            padding: 4,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            width: '100%',
+    <Layout style={{ minHeight: '100vh', background: '#f0f2f5' }}>
+      <Content style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <Card 
+          style={{ 
+            width: 400, 
+            padding: '24px',
+            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+            borderRadius: '8px'
           }}
         >
-          <Typography component="h1" variant="h5" sx={{ mb: 3 }}>
-            HRMS Login
-          </Typography>
+          <Space direction="vertical" size="large" style={{ width: '100%' }}>
+            <div style={{ textAlign: 'center' }}>
+              <Title level={2} style={{ marginBottom: 32, color: '#1890ff' }}>
+                TeamPulse Login
+              </Title>
+            </div>
 
-          {error && (
-            <Alert severity="error" sx={{ width: '100%', mb: 2 }}>
-              {error}
-            </Alert>
-          )}
+            {error && (
+              <Alert
+                message="Error"
+                description={error}
+                type="error"
+                showIcon
+                style={{ marginBottom: 24 }}
+              />
+            )}
 
-          <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="email"
-              label="Email Address"
-              name="email"
-              autoComplete="email"
-              autoFocus
-              value={formData.email}
-              onChange={handleChange}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              name="password"
-              label="Password"
-              type="password"
-              id="password"
-              autoComplete="current-password"
-              value={formData.password}
-              onChange={handleChange}
-            />
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              sx={{ mt: 3, mb: 2 }}
-              disabled={isLoading}
+            <Form
+              name="login"
+              onFinish={handleSubmit}
+              layout="vertical"
+              size="large"
             >
-              {isLoading ? 'Signing in...' : 'Sign In'}
-            </Button>
-          </Box>
-        </Paper>
-      </Box>
-    </Container>
+              <Form.Item
+                name="email"
+                rules={[
+                  { required: true, message: 'Please input your email!' },
+                  { type: 'email', message: 'Please enter a valid email!' }
+                ]}
+              >
+                <Input 
+                  prefix={<UserOutlined />} 
+                  placeholder="Email"
+                  autoComplete="email"
+                />
+              </Form.Item>
+
+              <Form.Item
+                name="password"
+                rules={[{ required: true, message: 'Please input your password!' }]}
+              >
+                <Input.Password
+                  prefix={<LockOutlined />}
+                  placeholder="Password"
+                  autoComplete="current-password"
+                />
+              </Form.Item>
+
+              <Form.Item>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={isLoading}
+                  block
+                  size="large"
+                >
+                  Log In
+                </Button>
+              </Form.Item>
+            </Form>
+          </Space>
+        </Card>
+      </Content>
+    </Layout>
   );
 };
 

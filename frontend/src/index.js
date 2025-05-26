@@ -1,21 +1,22 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Provider } from 'react-redux';
-import { ThemeProvider } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
+import { ConfigProvider } from 'antd';
 import theme from './theme';
 import store from './store';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
+// Import Ant Design styles
+import 'antd/dist/reset.css';
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <Provider store={store}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-    <App />
-      </ThemeProvider>
+      <ConfigProvider theme={theme}>
+        <App />
+      </ConfigProvider>
     </Provider>
   </React.StrictMode>
 );

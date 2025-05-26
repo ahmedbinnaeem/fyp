@@ -8,6 +8,7 @@ const {
   getUsers,
   updateUser,
   changePassword,
+  deleteUser
 } = require('../controllers/userController');
 const { protect, admin } = require('../middleware/authMiddleware');
 
@@ -21,6 +22,6 @@ router
 router.put('/change-password', protect, changePassword);
 
 // Add route for updating specific user by ID
-router.route('/:id').put(protect, admin, updateUser);
+router.route('/:id').put(protect, admin, updateUser).delete(protect, admin, deleteUser);
 
 module.exports = router; 

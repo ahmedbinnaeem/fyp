@@ -1,38 +1,35 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Box,
-  Grid,
-  Paper,
-  Typography,
-  CircularProgress,
+  Row,
+  Col,
   Card,
-  CardContent,
-  List,
-  ListItem,
-  ListItemText,
-  Divider,
-  Chip,
+  Typography,
+  Spin,
   Alert,
   Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  LinearProgress,
-} from '@mui/material';
+  Tag,
+  Statistic,
+  Progress,
+  Space,
+  List,
+  Avatar,
+} from 'antd';
 import {
-  People as PeopleIcon,
-  Assignment as AssignmentIcon,
-  EventNote as EventNoteIcon,
-  AccessTime as AccessTimeIcon,
-  AttachMoney as AttachMoneyIcon,
-  CheckCircle as CheckCircleIcon,
-  Cancel as CancelIcon,
-  Warning as WarningIcon,
-} from '@mui/icons-material';
+  TeamOutlined,
+  ProjectOutlined,
+  CalendarOutlined,
+  ClockCircleOutlined,
+  DollarOutlined,
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  WarningOutlined,
+  PauseCircleOutlined,
+  StopOutlined,
+} from '@ant-design/icons';
 import { useSelector } from 'react-redux';
 import api from '../utils/axios';
+
+const { Title, Text } = Typography;
 
 const Dashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
@@ -65,35 +62,23 @@ const Dashboard = () => {
   }, [user]);
 
   if (!user) {
-    return (
-      <Box m={2}>
-        <Alert severity="error">Please log in to view the dashboard</Alert>
-      </Box>
-    );
+    return <Alert message="Please log in to view the dashboard" type="error" showIcon />;
   }
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
-        <CircularProgress />
-        </Box>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <Spin size="large" />
+      </div>
     );
   }
 
   if (error) {
-    return (
-      <Box m={2}>
-        <Alert severity="error">{error}</Alert>
-      </Box>
-    );
+    return <Alert message={error} type="error" showIcon />;
   }
 
   if (!dashboardData) {
-    return (
-      <Box m={2}>
-        <Alert severity="warning">No dashboard data available</Alert>
-        </Box>
-    );
+    return <Alert message="No dashboard data available" type="warning" showIcon />;
   }
 
   return user.role === 'admin' ? (
@@ -105,14 +90,26 @@ const Dashboard = () => {
 
 const AdminDashboard = ({ data }) => {
   if (!data || !data.stats || !data.recentProjects || !data.recentActivities) {
-    return (
-      <Box m={2}>
-        <Alert severity="warning">Incomplete dashboard data</Alert>
-      </Box>
-    );
+    return <Alert message="Incomplete dashboard data" type="warning" showIcon />;
   }
 
   const { stats, recentProjects, recentActivities } = data;
+
+  const getStatusTag = (status) => {
+    const statusConfig = {
+      'Completed': { color: 'success', icon: <CheckCircleOutlined /> },
+      'In Progress': { color: 'processing', icon: <ClockCircleOutlined /> },
+      'On Hold': { color: 'warning', icon: <PauseCircleOutlined /> },
+      'Not Started': { color: 'default', icon: <StopOutlined /> },
+    };
+
+    const config = statusConfig[status] || { color: 'default', icon: null };
+    return (
+      <Tag color={config.color} icon={config.icon}>
+        {status.toUpperCase()}
+      </Tag>
+    );
+  }
 
   // Ensure all required stats exist
   const defaultStats = {
@@ -125,379 +122,235 @@ const AdminDashboard = ({ data }) => {
 
   const safeStats = { ...defaultStats, ...stats };
 
+  const projectColumns = [
+    {
+      title: 'Project Name',
+      dataIndex: 'name',
+      key: 'name',
+      render: (text) => text || 'Untitled Project',
+    },
+    {
+      title: 'Team Lead',
+      dataIndex: 'teamLead',
+      key: 'teamLead',
+      render: (teamLead) => 
+        teamLead ? `${teamLead.firstName} ${teamLead.lastName}` : 'Not Assigned',
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status) => getStatusTag(status),
+    },
+  ];
+
   return (
-    <Box p={3}>
-      <Typography variant="h4" gutterBottom>
-        Admin Dashboard
-      </Typography>
+    <div style={{ padding: 24 }}>
+      <Title level={2}>Admin Dashboard</Title>
 
-      <Grid container spacing={3}>
-        {/* Stats Cards */}
-        <Grid item xs={12} sm={6} md={4} lg={2.4}>
-          <StatsCard
-            icon={<PeopleIcon fontSize="large" color="primary" />}
-            title="Total Employees"
-            value={safeStats.totalEmployees}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4} lg={2.4}>
-          <StatsCard
-            icon={<AssignmentIcon fontSize="large" color="primary" />}
-            title="Active Projects"
-            value={safeStats.activeProjects}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4} lg={2.4}>
-          <StatsCard
-            icon={<EventNoteIcon fontSize="large" color="warning" />}
-            title="Pending Leaves"
-            value={safeStats.pendingLeaves}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4} lg={2.4}>
-          <StatsCard
-            icon={<AccessTimeIcon fontSize="large" color="info" />}
-            title="Today's Attendance"
-            value={safeStats.todayAttendance}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4} lg={2.4}>
-          <StatsCard
-            icon={<AttachMoneyIcon fontSize="large" color="success" />}
-            title="Monthly Payroll"
-            value={`$${safeStats.monthlyPayroll.toLocaleString()}`}
-          />
-        </Grid>
+      <Row gutter={[24, 24]}>
+        <Col xs={24} sm={12} md={8} lg={4.8}>
+          <Card>
+            <Statistic
+              title="Total Employees"
+              value={safeStats.totalEmployees}
+              prefix={<TeamOutlined />}
+              valueStyle={{ color: '#1890ff' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={4.8}>
+          <Card>
+            <Statistic
+              title="Active Projects"
+              value={safeStats.activeProjects}
+              prefix={<ProjectOutlined />}
+              valueStyle={{ color: '#1890ff' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={4.8}>
+          <Card>
+            <Statistic
+              title="Pending Leaves"
+              value={safeStats.pendingLeaves}
+              prefix={<CalendarOutlined />}
+              valueStyle={{ color: '#faad14' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={4.8}>
+          <Card>
+            <Statistic
+              title="Today's Attendance"
+              value={safeStats.todayAttendance}
+              prefix={<ClockCircleOutlined />}
+              valueStyle={{ color: '#52c41a' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={8} lg={4.8}>
+          <Card>
+            <Statistic
+              title="Monthly Payroll"
+              value={safeStats.monthlyPayroll}
+              prefix={<DollarOutlined />}
+              valueStyle={{ color: '#52c41a' }}
+            />
+          </Card>
+        </Col>
 
-        {/* Recent Projects */}
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Recent Projects
-            </Typography>
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Project Name</TableCell>
-                    <TableCell>Team Lead</TableCell>
-                    <TableCell>Status</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {(recentProjects || []).map((project) => (
-                    <TableRow key={project._id || 'temp-key'}>
-                      <TableCell>{project.name || 'Untitled Project'}</TableCell>
-                      <TableCell>
-                        {project.teamLead ? 
-                          `${project.teamLead.firstName} ${project.teamLead.lastName}` :
-                          'Not Assigned'
-                        }
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={project.status || 'Not Set'}
-                          color={
-                            project.status === 'Completed'
-                              ? 'success'
-                              : project.status === 'In Progress'
-                              ? 'primary'
-                              : project.status === 'On Hold'
-                              ? 'warning'
-                              : 'default'
-                          }
-                          size="small"
-                        />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
-        </Grid>
+        <Col xs={24} md={12}>
+          <Card title="Recent Projects">
+            <Table
+              columns={projectColumns}
+              dataSource={recentProjects || []}
+              rowKey={(record) => record._id || 'temp-key'}
+              pagination={false}
+              size="small"
+            />
+          </Card>
+        </Col>
 
-        {/* Recent Activities */}
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Recent Activities
-            </Typography>
-            <List>
-              {/* Leaves Activities */}
-              {recentActivities?.leaves?.map((leave, index) => (
-                <React.Fragment key={leave._id || `leave-${index}`}>
-                  <ListItem>
-                    <ListItemText
-                      primary={`${leave.user.firstName} ${leave.user.lastName} - ${leave.leaveType} Leave`}
-                      secondary={`Status: ${leave.status} | Duration: ${leave.duration} days (${new Date(leave.startDate).toLocaleDateString()} - ${new Date(leave.endDate).toLocaleDateString()})`}
-                    />
-                  </ListItem>
-                  {index < (recentActivities.leaves.length - 1) && <Divider />}
-                </React.Fragment>
-              ))}
-
-              {/* Attendance Activities */}
-              {recentActivities?.attendance?.map((attendance, index) => (
-                <React.Fragment key={attendance._id || `attendance-${index}`}>
-                  {recentActivities.leaves?.length > 0 && <Divider />}
-                  <ListItem>
-                    <ListItemText
-                      primary={`${attendance.user.firstName} ${attendance.user.lastName} - Attendance`}
-                      secondary={`Status: ${attendance.status} | Check-in: ${new Date(attendance.checkIn.time).toLocaleTimeString()} | Check-out: ${attendance.checkOut ? new Date(attendance.checkOut.time).toLocaleTimeString() : 'Not checked out'}`}
-                    />
-                  </ListItem>
-                  {index < (recentActivities.attendance.length - 1) && <Divider />}
-                </React.Fragment>
-              ))}
-
-              {(!recentActivities?.leaves?.length && !recentActivities?.attendance?.length) && (
-                <ListItem>
-                  <ListItemText primary="No recent activities" />
-                </ListItem>
+        <Col xs={24} md={12}>
+          <Card title="Recent Activities">
+            <List
+              size="small"
+              dataSource={recentActivities.leaves || []}
+              renderItem={(activity) => (
+                <List.Item>
+                  <List.Item.Meta
+                    avatar={
+                      <Avatar style={{ backgroundColor: activity.status === 'approved' ? '#52c41a' : '#f5222d' }}>
+                        {activity.status === 'approved' ? <CheckCircleOutlined /> : <CloseCircleOutlined />}
+                      </Avatar>
+                    }
+                    title={`${activity.user.firstName} ${activity.user.lastName}`}
+                    description={`Leave request ${activity.status} for ${activity.startDate} to ${activity.endDate}`}
+                  />
+                </List.Item>
               )}
-            </List>
-          </Paper>
-        </Grid>
-      </Grid>
-    </Box>
+            />
+          </Card>
+        </Col>
+      </Row>
+    </div>
   );
 };
 
 const EmployeeDashboard = ({ data }) => {
   if (!data || !data.stats) {
-    return (
-      <Box m={2}>
-        <Alert severity="warning">Incomplete dashboard data</Alert>
-      </Box>
-    );
+    return <Alert message="Incomplete dashboard data" type="warning" showIcon />;
   }
 
   const { stats, currentProjects = [], latestPayslip = null, recentActivities = { leaves: [] } } = data;
 
   return (
-    <Box p={3}>
-      <Typography variant="h4" gutterBottom>
-        My Dashboard
-      </Typography>
+    <div style={{ padding: 24 }}>
+      <Title level={2}>My Dashboard</Title>
 
-      <Grid container spacing={3}>
-        {/* Stats Cards */}
-        <Grid item xs={12} sm={6} md={3}>
-          <StatsCard
-            icon={<AssignmentIcon fontSize="large" color="primary" />}
-            title="Active Projects"
-            value={stats.activeProjects || 0}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatsCard
-            icon={<EventNoteIcon fontSize="large" color="warning" />}
-            title="Pending Leaves"
-            value={stats.pendingLeaves || 0}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatsCard
-            icon={<CheckCircleIcon fontSize="large" color="success" />}
-            title="Leave Balance"
-            value={stats.leaveBalance ? 
-              `${stats.leaveBalance.remaining || 0}/${stats.leaveBalance.total || 0} days` : 
-              '0/0 days'}
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <StatsCard
-            icon={<AccessTimeIcon fontSize="large" color="info" />}
-            title="Monthly Attendance"
-            value={stats.attendance ? 
-              `${stats.attendance.present || 0}/${stats.attendance.total || 0} days` :
-              '0/0 days'}
-          />
-      </Grid>
+      <Row gutter={[24, 24]}>
+        <Col xs={24} sm={12} md={6}>
+          <Card>
+            <Statistic
+              title="Active Projects"
+              value={stats.activeProjects || 0}
+              prefix={<ProjectOutlined />}
+              valueStyle={{ color: '#1890ff' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={6}>
+          <Card>
+            <Statistic
+              title="Pending Leaves"
+              value={stats.pendingLeaves || 0}
+              prefix={<CalendarOutlined />}
+              valueStyle={{ color: '#faad14' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={6}>
+          <Card>
+            <Statistic
+              title="Leave Balance"
+              value={stats.leaveBalance ? stats.leaveBalance.remaining : 0}
+              suffix={`/ ${stats.leaveBalance ? stats.leaveBalance.total : 0}`}
+              prefix={<CheckCircleOutlined />}
+              valueStyle={{ color: '#52c41a' }}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={12} md={6}>
+          <Card>
+            <Statistic
+              title="Monthly Attendance"
+              value={stats.attendance ? stats.attendance.present : 0}
+              suffix={`/ ${stats.attendance ? stats.attendance.total : 0}`}
+              prefix={<ClockCircleOutlined />}
+              valueStyle={{ color: '#1890ff' }}
+            />
+          </Card>
+        </Col>
 
-        {/* Current Projects */}
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Current Projects
-            </Typography>
-            {currentProjects && currentProjects.length > 0 ? (
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Project Name</TableCell>
-                      <TableCell>Team Lead</TableCell>
-                      <TableCell>Progress</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {currentProjects.map((project) => (
-                      <TableRow key={project._id}>
-                        <TableCell>{project.name}</TableCell>
-                        <TableCell>
-                          {project.teamLead ? 
-                            `${project.teamLead.firstName} ${project.teamLead.lastName}` :
-                            'Not Assigned'}
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <Box sx={{ width: '100%', mr: 1 }}>
-                              <LinearProgress
-                                variant="determinate"
-                                value={project.progress || 0}
-                                color={
-                                  project.progress >= 75
-                                    ? 'success'
-                                    : project.progress >= 50
-                                    ? 'primary'
-                                    : project.progress >= 25
-                                    ? 'warning'
-                                    : 'error'
-                                }
-                              />
-                            </Box>
-                            <Box sx={{ minWidth: 35 }}>
-                              <Typography variant="body2" color="text.secondary">
-                                {`${project.progress || 0}%`}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            ) : (
-              <Typography color="text.secondary">No active projects</Typography>
-            )}
-          </Paper>
-        </Grid>
-
-        {/* Latest Payslip */}
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Latest Payslip
-            </Typography>
-            {latestPayslip ? (
-              <List>
-                <ListItem>
-                  <ListItemText
-                    primary="Basic Salary"
-                    secondary={`$${(latestPayslip.basicSalary || 0).toLocaleString()}`}
+        <Col xs={24} md={12}>
+          <Card title="Current Projects">
+            <List
+              size="small"
+              dataSource={currentProjects}
+              renderItem={(project) => (
+                <List.Item
+                  extra={
+                    <Tag color={
+                      project.status === 'completed' ? 'success' :
+                      project.status === 'in_progress' ? 'processing' :
+                      project.status === 'on_hold' ? 'warning' :
+                      'default'
+                    }>
+                      {project.status ? project.status.replace('_', ' ').toUpperCase() : 'NOT SET'}
+                    </Tag>
+                  }
+                >
+                  <List.Item.Meta
+                    title={project.name}
+                    description={`Team Lead: ${project.teamLead ? `${project.teamLead.firstName} ${project.teamLead.lastName}` : 'Not Assigned'}`}
                   />
-                </ListItem>
-                <Divider />
-                <ListItem>
-                  <ListItemText
-                    primary="Total Allowances"
-                    secondary={`$${Object.values(latestPayslip.allowances || {})
-                      .reduce((a, b) => a + b, 0)
-                      .toLocaleString()}`}
-                  />
-                </ListItem>
-                <Divider />
-                <ListItem>
-                  <ListItemText
-                    primary="Total Deductions"
-                    secondary={`$${Object.values(latestPayslip.deductions || {})
-                      .reduce((a, b) => a + b, 0)
-                      .toLocaleString()}`}
-                  />
-                </ListItem>
-                <Divider />
-                <ListItem>
-                  <ListItemText
-                    primary="Net Salary"
-                    secondary={`$${(latestPayslip.netSalary || 0).toLocaleString()}`}
-                  />
-                </ListItem>
-              </List>
-            ) : (
-              <Typography color="text.secondary">No payslip available</Typography>
-            )}
-          </Paper>
-        </Grid>
+                </List.Item>
+              )}
+            />
+          </Card>
+        </Col>
 
-        {/* Attendance Summary */}
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Monthly Attendance Summary
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={4}>
-                <Box textAlign="center">
-                  <CheckCircleIcon color="success" sx={{ fontSize: 40 }} />
-                  <Typography variant="h6">{stats.attendance?.present || 0}</Typography>
-                  <Typography color="text.secondary">Present</Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={4}>
-                <Box textAlign="center">
-                  <WarningIcon color="warning" sx={{ fontSize: 40 }} />
-                  <Typography variant="h6">{stats.attendance?.late || 0}</Typography>
-                  <Typography color="text.secondary">Late</Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={4}>
-                <Box textAlign="center">
-                  <CancelIcon color="error" sx={{ fontSize: 40 }} />
-                  <Typography variant="h6">{stats.attendance?.absent || 0}</Typography>
-                  <Typography color="text.secondary">Absent</Typography>
-                </Box>
-              </Grid>
-            </Grid>
-          </Paper>
-        </Grid>
-
-        {/* Recent Activities */}
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Recent Activities
-            </Typography>
-            {recentActivities.leaves && recentActivities.leaves.length > 0 ? (
-              <List>
-                {recentActivities.leaves.map((leave) => (
-                  <React.Fragment key={leave._id}>
-                    <ListItem>
-                      <ListItemText
-                        primary={`${leave.leaveType} Leave`}
-                        secondary={`Status: ${leave.status} | Duration: ${leave.duration} days`}
-                      />
-                    </ListItem>
-                    <Divider />
-                  </React.Fragment>
-                ))}
-              </List>
-            ) : (
-              <Typography color="text.secondary">No recent activities</Typography>
-            )}
-          </Paper>
-        </Grid>
-      </Grid>
-    </Box>
+        <Col xs={24} md={12}>
+          <Card title="Attendance Summary">
+            <Row gutter={16}>
+              <Col span={8}>
+                <Statistic
+                  title="Present"
+                  value={stats.attendance?.present || 0}
+                  prefix={<CheckCircleOutlined style={{ color: '#52c41a' }} />}
+                />
+              </Col>
+              <Col span={8}>
+                <Statistic
+                  title="Late"
+                  value={stats.attendance?.late || 0}
+                  prefix={<WarningOutlined style={{ color: '#faad14' }} />}
+                />
+              </Col>
+              <Col span={8}>
+                <Statistic
+                  title="Absent"
+                  value={stats.attendance?.absent || 0}
+                  prefix={<CloseCircleOutlined style={{ color: '#f5222d' }} />}
+                />
+              </Col>
+            </Row>
+          </Card>
+        </Col>
+      </Row>
+    </div>
   );
 };
-
-const StatsCard = ({ icon, title, value }) => (
-  <Card>
-    <CardContent>
-      <Box display="flex" alignItems="center" mb={1}>
-        {icon}
-      </Box>
-      <Typography color="textSecondary" gutterBottom>
-        {title}
-      </Typography>
-      <Typography variant="h5" component="div">
-        {value}
-      </Typography>
-    </CardContent>
-  </Card>
-);
 
 export default Dashboard; 

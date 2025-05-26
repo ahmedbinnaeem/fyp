@@ -1,21 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
+  Card,
   Typography,
-  Paper,
-  Grid,
-  TextField,
+  Form,
+  Input,
   Button,
   Avatar,
-  CircularProgress,
+  Spin,
   Alert,
-  Card,
-  CardContent,
+  Row,
+  Col,
   Divider,
-} from '@mui/material';
+  Space,
+  message,
+} from 'antd';
+import {
+  UserOutlined,
+  MailOutlined,
+  PhoneOutlined,
+  HomeOutlined,
+  LockOutlined,
+} from '@ant-design/icons';
 import { useSelector, useDispatch } from 'react-redux';
 import { getUserProfile } from '../store/slices/authSlice';
 import api from '../utils/axios';
+
+const { Title, Text } = Typography;
 
 const Profile = () => {
   const dispatch = useDispatch();
@@ -23,110 +33,59 @@ const Profile = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  
-  const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-    address: '',
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: '',
-  });
+  const [form] = Form.useForm();
+  const [passwordForm] = Form.useForm();
 
-  // Update form data when user data changes
   useEffect(() => {
     if (user) {
-      setFormData(prev => ({
-        ...prev,
+      form.setFieldsValue({
         firstName: user.firstName || '',
         lastName: user.lastName || '',
         email: user.email || '',
-        phone: user.phoneNumber || '', // Map phoneNumber to phone
+        phone: user.phoneNumber || '',
         address: user.address || '',
-      }));
+      });
     }
-  }, [user]);
+  }, [user, form]);
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-    setError(null);
-    setSuccess(null);
-  };
-
-  const handleUpdateProfile = async (e) => {
-    e.preventDefault();
+  const handleUpdateProfile = async (values) => {
     try {
       setLoading(true);
       setError(null);
       setSuccess(null);
 
-      const { currentPassword, newPassword, confirmPassword, ...profileData } = formData;
+      const { phone, ...profileData } = values;
 
-      // Filter out empty values
-      const filteredData = Object.fromEntries(
-        Object.entries(profileData).filter(([_, value]) => value !== '')
-      );
-
-      // Map phone to phoneNumber before sending
-      if (filteredData.phone) {
-        filteredData.phoneNumber = filteredData.phone;
-        delete filteredData.phone;
+      // Map phone to phoneNumber
+      if (phone) {
+        profileData.phoneNumber = phone;
       }
 
-      await api.put('/users/profile', filteredData);
+      await api.put('/users/profile', profileData);
       await dispatch(getUserProfile()).unwrap();
-      setSuccess('Profile updated successfully');
+      message.success('Profile updated successfully');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to update profile');
+      message.error(err.response?.data?.message || 'Failed to update profile');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChangePassword = async (e) => {
-    e.preventDefault();
-    
-    // Validate password fields
-    if (!formData.currentPassword || !formData.newPassword || !formData.confirmPassword) {
-      setError('All password fields are required');
-      return;
-    }
-    
-    if (formData.newPassword !== formData.confirmPassword) {
-      setError('New passwords do not match');
-      return;
-    }
-
-    if (formData.newPassword.length < 6) {
-      setError('New password must be at least 6 characters long');
-      return;
-    }
-
+  const handleChangePassword = async (values) => {
     try {
       setLoading(true);
       setError(null);
       setSuccess(null);
 
       await api.put('/users/change-password', {
-        currentPassword: formData.currentPassword,
-        newPassword: formData.newPassword,
+        currentPassword: values.currentPassword,
+        newPassword: values.newPassword,
       });
 
-      setSuccess('Password changed successfully');
-      setFormData((prev) => ({
-        ...prev,
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: '',
-      }));
+      message.success('Password changed successfully');
+      passwordForm.resetFields();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to change password');
+      message.error(err.response?.data?.message || 'Failed to change password');
     } finally {
       setLoading(false);
     }
@@ -134,177 +93,172 @@ const Profile = () => {
 
   if (!user) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
-        <CircularProgress />
-      </Box>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
+        <Spin size="large" />
+      </div>
     );
   }
 
   return (
-    <Box>
-      <Typography variant="h4" gutterBottom>
-        My Profile
-      </Typography>
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px' }}>
+      <Title level={2}>My Profile</Title>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
+        <Alert message={error} type="error" showIcon style={{ marginBottom: 24 }} />
       )}
 
       {success && (
-        <Alert severity="success" sx={{ mb: 2 }}>
-          {success}
-        </Alert>
+        <Alert message={success} type="success" showIcon style={{ marginBottom: 24 }} />
       )}
 
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={4}>
+      <Row gutter={24}>
+        <Col xs={24} md={8}>
           <Card>
-            <CardContent>
-              <Box display="flex" flexDirection="column" alignItems="center">
-                <Avatar
-                  sx={{
-                    width: 100,
-                    height: 100,
-                    mb: 2,
-                    bgcolor: 'primary.main',
-                    fontSize: '2rem',
-                  }}
-                >
-                  {user.firstName[0]}
-                  {user.lastName[0]}
-                </Avatar>
-                <Typography variant="h6">
-                  {user.firstName} {user.lastName}
-                </Typography>
-                <Typography color="textSecondary">{user.role}</Typography>
-              </Box>
-            </CardContent>
+            <div style={{ textAlign: 'center' }}>
+              <Avatar
+                size={100}
+                style={{
+                  backgroundColor: '#1890ff',
+                  fontSize: '2rem',
+                  marginBottom: 16,
+                }}
+              >
+                {user.firstName[0]}
+                {user.lastName[0]}
+              </Avatar>
+              <Title level={4} style={{ marginBottom: 4 }}>
+                {user.firstName} {user.lastName}
+              </Title>
+              <Text type="secondary" style={{ textTransform: 'capitalize' }}>
+                {user.position || user.role}
+              </Text>
+            </div>
           </Card>
-        </Grid>
+        </Col>
 
-        <Grid item xs={12} md={8}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Personal Information
-            </Typography>
-            <Box component="form" onSubmit={handleUpdateProfile}>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <TextField
+        <Col xs={24} md={16}>
+          <Card title="Personal Information">
+            <Form
+              form={form}
+              layout="vertical"
+              onFinish={handleUpdateProfile}
+              initialValues={{
+                firstName: user.firstName || '',
+                lastName: user.lastName || '',
+                email: user.email || '',
+                phone: user.phoneNumber || '',
+                address: user.address || '',
+              }}
+            >
+              <Row gutter={16}>
+                <Col xs={24} sm={12}>
+                  <Form.Item
                     name="firstName"
                     label="First Name"
-                    value={formData.firstName}
-                    onChange={handleInputChange}
-                    fullWidth
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
+                    rules={[{ required: true, message: 'Please input your first name!' }]}
+                  >
+                    <Input prefix={<UserOutlined />} />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item
                     name="lastName"
                     label="Last Name"
-                    value={formData.lastName}
-                    onChange={handleInputChange}
-                    fullWidth
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    name="email"
-                    label="Email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    fullWidth
-                    type="email"
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    name="phone"
-                    label="Phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    fullWidth
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    name="address"
-                    label="Address"
-                    value={formData.address}
-                    onChange={handleInputChange}
-                    fullWidth
-                    multiline
-                    rows={3}
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    color="primary"
-                    disabled={loading}
+                    rules={[{ required: true, message: 'Please input your last name!' }]}
                   >
-                    {loading ? <CircularProgress size={24} /> : 'Update Profile'}
-                  </Button>
-                </Grid>
-              </Grid>
-            </Box>
+                    <Input prefix={<UserOutlined />} />
+                  </Form.Item>
+                </Col>
+              </Row>
 
-            <Divider sx={{ my: 4 }} />
+              <Form.Item
+                name="email"
+                label="Email"
+                rules={[
+                  { required: true, message: 'Please input your email!' },
+                  { type: 'email', message: 'Please enter a valid email!' }
+                ]}
+              >
+                <Input prefix={<MailOutlined />} />
+              </Form.Item>
 
-            <Typography variant="h6" gutterBottom>
-              Change Password
-            </Typography>
-            <Box component="form" onSubmit={handleChangePassword}>
-              <Grid container spacing={2}>
-                <Grid item xs={12}>
-                  <TextField
-                    name="currentPassword"
-                    label="Current Password"
-                    type="password"
-                    value={formData.currentPassword}
-                    onChange={handleInputChange}
-                    fullWidth
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    name="newPassword"
-                    label="New Password"
-                    type="password"
-                    value={formData.newPassword}
-                    onChange={handleInputChange}
-                    fullWidth
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    name="confirmPassword"
-                    label="Confirm New Password"
-                    type="password"
-                    value={formData.confirmPassword}
-                    onChange={handleInputChange}
-                    fullWidth
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <Button
-                    type="submit"
-                    variant="contained"
-                    color="primary"
-                    disabled={loading}
-                  >
-                    {loading ? <CircularProgress size={24} /> : 'Change Password'}
-                  </Button>
-                </Grid>
-              </Grid>
-            </Box>
-          </Paper>
-        </Grid>
-      </Grid>
-    </Box>
+              <Form.Item
+                name="phone"
+                label="Phone Number"
+              >
+                <Input prefix={<PhoneOutlined />} />
+              </Form.Item>
+
+              <Form.Item
+                name="address"
+                label="Address"
+              >
+                <Input.TextArea prefix={<HomeOutlined />} rows={3} />
+              </Form.Item>
+
+              <Form.Item>
+                <Button type="primary" htmlType="submit" loading={loading}>
+                  Update Profile
+                </Button>
+              </Form.Item>
+            </Form>
+
+            <Divider />
+
+            <Title level={4}>Change Password</Title>
+            <Form
+              form={passwordForm}
+              layout="vertical"
+              onFinish={handleChangePassword}
+            >
+              <Form.Item
+                name="currentPassword"
+                label="Current Password"
+                rules={[{ required: true, message: 'Please input your current password!' }]}
+              >
+                <Input.Password prefix={<LockOutlined />} />
+              </Form.Item>
+
+              <Form.Item
+                name="newPassword"
+                label="New Password"
+                rules={[
+                  { required: true, message: 'Please input your new password!' },
+                  { min: 6, message: 'Password must be at least 6 characters!' }
+                ]}
+              >
+                <Input.Password prefix={<LockOutlined />} />
+              </Form.Item>
+
+              <Form.Item
+                name="confirmPassword"
+                label="Confirm New Password"
+                dependencies={['newPassword']}
+                rules={[
+                  { required: true, message: 'Please confirm your new password!' },
+                  ({ getFieldValue }) => ({
+                    validator(_, value) {
+                      if (!value || getFieldValue('newPassword') === value) {
+                        return Promise.resolve();
+                      }
+                      return Promise.reject(new Error('The two passwords do not match!'));
+                    },
+                  }),
+                ]}
+              >
+                <Input.Password prefix={<LockOutlined />} />
+              </Form.Item>
+
+              <Form.Item>
+                <Button type="primary" htmlType="submit" loading={loading}>
+                  Change Password
+                </Button>
+              </Form.Item>
+            </Form>
+          </Card>
+        </Col>
+      </Row>
+    </div>
   );
 };
 

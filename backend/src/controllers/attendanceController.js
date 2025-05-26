@@ -1,23 +1,33 @@
 const Attendance = require('../models/Attendance');
 
+// Utility function to get today's attendance status
+const getTodayAttendanceStatus = async (userId) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const todayAttendance = await Attendance.findOne({
+    user: userId,
+    date: {
+      $gte: today,
+      $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
+    },
+  });
+
+  return {
+    isClockedIn: !!todayAttendance?.checkIn?.time,
+    isClockedOut: !!todayAttendance?.checkOut?.time,
+    attendance: todayAttendance
+  };
+};
+
 // @desc    Clock In
 // @route   POST /api/attendance/clock-in
 // @access  Private
 const clockIn = async (req, res) => {
   try {
-    // Check if already clocked in today
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const { isClockedIn } = await getTodayAttendanceStatus(req.user._id);
 
-    const existingAttendance = await Attendance.findOne({
-      user: req.user._id,
-      date: {
-        $gte: today,
-        $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
-      },
-    });
-
-    if (existingAttendance) {
+    if (isClockedIn) {
       return res.status(400).json({ message: 'Already clocked in for today' });
     }
 
@@ -39,7 +49,9 @@ const clockIn = async (req, res) => {
     const populatedAttendance = await Attendance.findById(attendance._id)
       .populate('user', 'firstName lastName email department');
 
-    res.status(201).json(populatedAttendance);
+    // Return the same structure as status endpoint
+    const updatedStatus = await getTodayAttendanceStatus(req.user._id);
+    res.status(201).json(updatedStatus);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -50,23 +62,13 @@ const clockIn = async (req, res) => {
 // @access  Private
 const clockOut = async (req, res) => {
   try {
-    // Find today's attendance record
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const { attendance, isClockedIn, isClockedOut } = await getTodayAttendanceStatus(req.user._id);
 
-    const attendance = await Attendance.findOne({
-      user: req.user._id,
-      date: {
-        $gte: today,
-        $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
-      },
-    });
-
-    if (!attendance) {
+    if (!isClockedIn) {
       return res.status(404).json({ message: 'No clock-in record found for today' });
     }
 
-    if (attendance.checkOut?.time) {
+    if (isClockedOut) {
       return res.status(400).json({ message: 'Already clocked out for today' });
     }
 
@@ -75,22 +77,11 @@ const clockOut = async (req, res) => {
       location: 'Office'
     };
 
-    // Calculate working hours
-    const checkInTime = new Date(attendance.checkIn.time).getTime();
-    const checkOutTime = new Date(attendance.checkOut.time).getTime();
-    const diffInMinutes = Math.floor((checkOutTime - checkInTime) / (1000 * 60));
+    await attendance.save();
     
-    attendance.workingHours = {
-      hours: Math.floor(diffInMinutes / 60),
-      minutes: diffInMinutes % 60,
-      total: Number((diffInMinutes / 60).toFixed(2))
-    };
-
-    const updatedAttendance = await attendance.save();
-    const populatedAttendance = await Attendance.findById(updatedAttendance._id)
-      .populate('user', 'firstName lastName email department');
-
-    res.json(populatedAttendance);
+    // Return the same structure as status endpoint
+    const updatedStatus = await getTodayAttendanceStatus(req.user._id);
+    res.json(updatedStatus);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }
@@ -146,24 +137,12 @@ const getMyAttendance = async (req, res) => {
       .populate('user', 'firstName lastName email department')
       .sort({ date: -1 });
 
-    // Get today's attendance status
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayAttendance = await Attendance.findOne({
-      user: req.user._id,
-      date: {
-        $gte: today,
-        $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000),
-      },
-    });
+    // Get today's attendance status using the shared utility function
+    const todayStatus = await getTodayAttendanceStatus(req.user._id);
 
     res.json({
       attendances,
-      todayStatus: {
-        isClockedIn: !!todayAttendance,
-        isClockedOut: !!(todayAttendance?.checkOut?.time),
-        attendance: todayAttendance,
-      },
+      todayStatus
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -288,6 +267,18 @@ const deleteAttendance = async (req, res) => {
   }
 };
 
+// @desc    Get clock-in status
+// @route   GET /api/attendance/status
+// @access  Private
+const getClockInStatus = async (req, res) => {
+  try {
+    const status = await getTodayAttendanceStatus(req.user._id);
+    res.json(status);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getAttendances,
   getMyAttendance,
@@ -297,4 +288,5 @@ module.exports = {
   deleteAttendance,
   clockIn,
   clockOut,
+  getClockInStatus,
 }; 
