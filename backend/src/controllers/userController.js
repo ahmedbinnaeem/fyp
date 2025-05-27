@@ -14,7 +14,7 @@ const generateToken = (id) => {
 // @access  Private/Admin
 const registerUser = async (req, res) => {
   try {
-    const { firstName, lastName, email, password, role, department, position, basicSalary } = req.body;
+    const { firstName, lastName, email, password, role, department, position, basicSalary, gender } = req.body;
 
     const userExists = await User.findOne({ email });
     if (userExists) {
@@ -29,7 +29,8 @@ const registerUser = async (req, res) => {
       role,
       department,
       position,
-      basicSalary: Number(basicSalary) || 0
+      basicSalary: Number(basicSalary) || 0,
+      gender
     });
 
     if (user) {
@@ -42,6 +43,7 @@ const registerUser = async (req, res) => {
         position: user.position,
         department: user.department,
         basicSalary: user.basicSalary,
+        gender: user.gender,
         token: generateToken(user._id),
       });
     }
@@ -77,6 +79,7 @@ const loginUser = async (req, res) => {
         email: user.email,
         role: user.role,
         department: user.department,
+        gender: user.gender,
         token: generateToken(user._id),
       });
     } else {
@@ -107,7 +110,8 @@ const getUserProfile = async (req, res) => {
         position: user.position,
         joinDate: user.joinDate,
         isActive: user.isActive,
-        profileImage: user.profileImage
+        profileImage: user.profileImage,
+        gender: user.gender
       });
     } else {
       res.status(404).json({ message: 'User not found' });
@@ -130,6 +134,7 @@ const updateUserProfile = async (req, res) => {
       user.email = req.body.email || user.email;
       user.phoneNumber = req.body.phoneNumber || user.phoneNumber;
       user.address = req.body.address || user.address;
+      user.gender = req.body.gender || user.gender;
       
       if (req.body.password) {
         user.password = req.body.password;
@@ -145,6 +150,7 @@ const updateUserProfile = async (req, res) => {
         department: updatedUser.department,
         phoneNumber: updatedUser.phoneNumber,
         address: updatedUser.address,
+        gender: updatedUser.gender,
         token: generateToken(updatedUser._id),
       });
     } else {
@@ -160,7 +166,8 @@ const updateUserProfile = async (req, res) => {
 // @access  Private/Admin
 const getUsers = async (req, res) => {
   try {
-    const users = await User.find({ role: { $ne: 'admin' } });
+    const users = await User.find({ role: { $ne: 'admin' } })
+      .select('firstName lastName email department role position basicSalary gender isActive joinDate');
     res.json(users);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -188,7 +195,8 @@ const updateUser = async (req, res) => {
       isActive,
       position,
       joinDate,
-      basicSalary
+      basicSalary,
+      gender
     } = req.body;
 
     user.firstName = firstName || user.firstName;
@@ -198,11 +206,26 @@ const updateUser = async (req, res) => {
     user.role = role || user.role;
     user.isActive = isActive !== undefined ? isActive : user.isActive;
     user.position = position || user.position;
+    user.gender = gender || user.gender;
     user.joinDate = joinDate || user.joinDate;
-    user.basicSalary = basicSalary !== undefined ? Number(basicSalary) : user.basicSalary;
+    user.basicSalary = basicSalary || user.basicSalary;
 
     const updatedUser = await user.save();
-    res.json(updatedUser);
+    
+    // Return all relevant fields in response
+    res.json({
+      _id: updatedUser._id,
+      firstName: updatedUser.firstName,
+      lastName: updatedUser.lastName,
+      email: updatedUser.email,
+      role: updatedUser.role,
+      department: updatedUser.department,
+      position: updatedUser.position,
+      basicSalary: updatedUser.basicSalary,
+      gender: updatedUser.gender,
+      isActive: updatedUser.isActive,
+      joinDate: updatedUser.joinDate
+    });
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

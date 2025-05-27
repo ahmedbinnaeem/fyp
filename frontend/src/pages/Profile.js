@@ -33,20 +33,58 @@ const Profile = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [settings, setSettings] = useState(null);
   const [form] = Form.useForm();
   const [passwordForm] = Form.useForm();
 
   useEffect(() => {
     if (user) {
+      // Extract username from email for editing
+      const domain = settings?.companyName ? 
+        `@${settings.companyName.toLowerCase().replace(/\s+/g, '')}.com` : '';
+      const username = user.email.replace(domain, '');
+
       form.setFieldsValue({
         firstName: user.firstName || '',
         lastName: user.lastName || '',
-        email: user.email || '',
+        email: username,
         phone: user.phoneNumber || '',
         address: user.address || '',
       });
     }
-  }, [user, form]);
+    fetchSettings();
+  }, [user, form, settings]);
+
+  const fetchSettings = async () => {
+    try {
+      const response = await api.get('/settings');
+      setSettings(response.data);
+    } catch (err) {
+      message.error('Failed to fetch company settings');
+    }
+  };
+
+  const validateEmail = (_, value) => {
+    if (!value) {
+      return Promise.reject('Please enter username');
+    }
+
+    if (!settings || !settings.companyName) {
+      return Promise.reject('Company settings not configured');
+    }
+
+    // Skip validation for admin users
+    if (user.role === 'admin') {
+      return Promise.resolve();
+    }
+
+    // Only validate the username part
+    if (!/^[a-zA-Z0-9._-]+$/.test(value)) {
+      return Promise.reject('Username can only contain letters, numbers, dots, underscores and hyphens');
+    }
+
+    return Promise.resolve();
+  };
 
   const handleUpdateProfile = async (values) => {
     try {
@@ -55,6 +93,10 @@ const Profile = () => {
       setSuccess(null);
 
       const { phone, ...profileData } = values;
+
+      // Construct the full email with domain
+      const domain = `@${settings.companyName.toLowerCase().replace(/\s+/g, '')}.com`;
+      profileData.email = values.email + domain;
 
       // Map phone to phoneNumber
       if (phone) {
@@ -173,13 +215,22 @@ const Profile = () => {
 
               <Form.Item
                 name="email"
-                label="Email"
+                label="Email Username"
                 rules={[
-                  { required: true, message: 'Please input your email!' },
-                  { type: 'email', message: 'Please enter a valid email!' }
+                  { required: true, message: 'Please enter username' },
+                  { validator: validateEmail }
                 ]}
+                extra={user.role !== 'admin' && settings?.companyName ? 
+                  `Enter username only - full email will be username@${settings.companyName.toLowerCase().replace(/\s+/g, '')}.com` : 
+                  undefined}
               >
-                <Input prefix={<MailOutlined />} />
+                <Input 
+                  prefix={<MailOutlined />}
+                  placeholder="username"
+                  addonAfter={settings?.companyName ? 
+                    `@${settings.companyName.toLowerCase().replace(/\s+/g, '')}.com` : 
+                    'Loading...'}
+                />
               </Form.Item>
 
               <Form.Item

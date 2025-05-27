@@ -50,18 +50,29 @@ const Settings = () => {
       setLoading(true);
       const response = await api.get('/settings');
       
-      // Convert time strings to dayjs objects
+      // Convert time strings to dayjs objects and ensure proper structure
       const formData = {
         ...response.data,
         workingHours: {
           start: response.data.workingHours?.start ? dayjs(response.data.workingHours.start, 'HH:mm') : null,
           end: response.data.workingHours?.end ? dayjs(response.data.workingHours.end, 'HH:mm') : null,
         },
+        leaveSettings: {
+          annualLeaveQuota: response.data.leaveSettings?.annualLeaveQuota || 14,
+          sickLeaveQuota: response.data.leaveSettings?.sickLeaveQuota || 7,
+          personalLeaveQuota: response.data.leaveSettings?.personalLeaveQuota || 5,
+          maternityLeaveQuota: response.data.leaveSettings?.maternityLeaveQuota || 90,
+          paternityLeaveQuota: response.data.leaveSettings?.paternityLeaveQuota || 14,
+          unpaidLeaveQuota: response.data.leaveSettings?.unpaidLeaveQuota || 30,
+          carryForwardLimit: response.data.leaveSettings?.carryForwardLimit || 5
+        }
       };
-      
+
+      console.log('Setting form values:', formData);
       form.setFieldsValue(formData);
       setError(null);
     } catch (err) {
+      console.error('Error fetching settings:', err);
       message.error(err.response?.data?.message || 'Failed to fetch settings');
       setError(err.response?.data?.message || 'Failed to fetch settings');
     } finally {
@@ -74,18 +85,48 @@ const Settings = () => {
       setLoading(true);
       setError(null);
 
-      // Ensure workingHours values are dayjs objects before formatting
+      // Format working hours and ensure all values are properly structured
       const formattedValues = {
         ...values,
         workingHours: {
           start: dayjs.isDayjs(values.workingHours?.start) ? values.workingHours.start.format('HH:mm') : null,
           end: dayjs.isDayjs(values.workingHours?.end) ? values.workingHours.end.format('HH:mm') : null,
-        },
+        }
       };
 
-      await api.put('/settings', formattedValues);
+      // Ensure all leave settings are numbers and properly nested
+      if (!formattedValues.leaveSettings) {
+        formattedValues.leaveSettings = {};
+      }
+
+      const leaveTypes = [
+        'annualLeaveQuota',
+        'sickLeaveQuota',
+        'personalLeaveQuota',
+        'maternityLeaveQuota',
+        'paternityLeaveQuota',
+        'unpaidLeaveQuota',
+        'carryForwardLimit'
+      ];
+
+      leaveTypes.forEach(type => {
+        console.log({type})
+        formattedValues.leaveSettings[type] = Number(values.leaveSettings?.[type]);
+      });
+      
+
+      // Log the values being sent for debugging
+      console.log('Submitting settings:', formattedValues);
+
+      const response = await api.put('/settings', formattedValues);
+      console.log('Settings update response:', response.data);
+      
       message.success('Settings updated successfully');
+      
+      // Refresh settings after update
+      await fetchSettings();
     } catch (err) {
+      console.error('Settings update error:', err);
       message.error(err.response?.data?.message || 'Failed to update settings');
       setError(err.response?.data?.message || 'Failed to update settings');
     } finally {
@@ -123,6 +164,15 @@ const Settings = () => {
             payrollSettings: {
               payrollCycle: 'monthly',
             },
+            leaveSettings: {
+              annualLeaveQuota: 14,
+              sickLeaveQuota: 7,
+              personalLeaveQuota: 5,
+              maternityLeaveQuota: 90,
+              paternityLeaveQuota: 14,
+              unpaidLeaveQuota: 30,
+              carryForwardLimit: 5
+            }
           }}
         >
           <Row gutter={[24, 24]}>
@@ -219,6 +269,40 @@ const Settings = () => {
                   name={['leaveSettings', 'sickLeaveQuota']}
                   label="Sick Leave Quota"
                   rules={[{ required: true, message: 'Please enter sick leave quota' }]}
+                >
+                  <InputNumber min={0} style={{ width: '100%' }} />
+                </Form.Item>
+
+                <Form.Item
+                  name={['leaveSettings', 'personalLeaveQuota']}
+                  label="Personal Leave Quota"
+                  rules={[{ required: true, message: 'Please enter personal leave quota' }]}
+                >
+                  <InputNumber min={0} style={{ width: '100%' }} />
+                </Form.Item>
+
+                <Form.Item
+                  name={['leaveSettings', 'maternityLeaveQuota']}
+                  label="Maternity Leave Quota"
+                  rules={[{ required: true, message: 'Please enter maternity leave quota' }]}
+                  tooltip="This will be available only for female employees"
+                >
+                  <InputNumber min={0} style={{ width: '100%' }} />
+                </Form.Item>
+
+                <Form.Item
+                  name={['leaveSettings', 'paternityLeaveQuota']}
+                  label="Paternity Leave Quota"
+                  rules={[{ required: true, message: 'Please enter paternity leave quota' }]}
+                  tooltip="This will be available only for male employees"
+                >
+                  <InputNumber min={0} style={{ width: '100%' }} />
+                </Form.Item>
+
+                <Form.Item
+                  name={['leaveSettings', 'unpaidLeaveQuota']}
+                  label="Unpaid Leave Quota"
+                  rules={[{ required: true, message: 'Please enter unpaid leave quota' }]}
                 >
                   <InputNumber min={0} style={{ width: '100%' }} />
                 </Form.Item>

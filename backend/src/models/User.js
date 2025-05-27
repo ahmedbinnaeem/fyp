@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const Setting = require('./Setting');
 
 const userSchema = new mongoose.Schema({
   firstName: {
@@ -12,12 +13,38 @@ const userSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  gender: {
+    type: String,
+    required: true,
+    enum: ['Male', 'Female'],
+    validate: {
+      validator: function(value) {
+        return ['Male', 'Female'].includes(value);
+      },
+      message: props => `${props.value} is not a valid gender`
+    }
+  },
   email: {
     type: String,
     required: true,
     unique: true,
     trim: true,
-    lowercase: true
+    lowercase: true,
+    validate: {
+      validator: async function(email) {
+        // Skip validation for admin users
+        if (this.role === 'admin') return true;
+        
+        const settings = await Setting.findOne();
+        if (!settings || !settings.companyName) {
+          throw new Error('Company settings not configured');
+        }
+        
+        const domain = `@${settings.companyName.toLowerCase().replace(/\s+/g, '')}.com`;
+        return email.endsWith(domain);
+      },
+      message: props => 'Email domain must match the company domain'
+    }
   },
   password: {
     type: String,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { Layout, Menu, Typography, Tooltip } from 'antd';
 import {
@@ -11,12 +11,15 @@ import {
   DollarOutlined,
   SettingOutlined,
   UserOutlined,
+  CalculatorOutlined,
 } from '@ant-design/icons';
 
 const { Sider } = Layout;
+const { SubMenu } = Menu;
 
 const Sidebar = ({ collapsed }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useSelector((state) => state.auth);
 
   const adminMenuItems = [
@@ -43,6 +46,14 @@ const Sidebar = ({ collapsed }) => {
       icon: <CalendarOutlined />,
       label: 'Leaves',
       path: '/leaves',
+      children: [
+        {
+          key: 'leave-balance',
+          icon: <CalculatorOutlined />,
+          label: 'Leave Balance',
+          path: '/leave-balance',
+        },
+      ],
     },
     {
       key: 'attendance',
@@ -82,12 +93,66 @@ const Sidebar = ({ collapsed }) => {
       icon: <CalendarOutlined />,
       label: 'Leaves',
       path: '/leaves',
+      children: [
+        {
+          key: 'leave-balance',
+          icon: <CalculatorOutlined />,
+          label: 'Leave Balance',
+          path: '/leave-balance',
+        },
+      ],
+    },
+    {
+      key: 'my-payroll',
+      icon: <DollarOutlined />,
+      label: 'Payroll',
+      path: '/my-payroll',
     },
   ];
 
   const menuItems = user?.role === 'admin' ? adminMenuItems : employeeMenuItems;
 
   const renderMenuItem = (item) => {
+    if (item.children) {
+      const subMenuTitle = (
+        <div 
+          className="ant-menu-submenu-title-content" 
+          style={{ display: 'inline-block', width: '100%' }}
+          onClick={(e) => {
+            const isArrowClick = e.target.closest('.ant-menu-submenu-arrow');
+            if (!isArrowClick) {
+              navigate(item.path);
+            }
+          }}
+        >
+          {item.icon}
+          <span>{item.label}</span>
+        </div>
+      );
+
+      return (
+        <SubMenu 
+          key={item.key} 
+          title={collapsed ? <Tooltip title={item.label}>{item.icon}</Tooltip> : subMenuTitle}
+          onTitleClick={(e) => {
+            const isArrowClick = e.domEvent.target.closest('.ant-menu-submenu-arrow');
+            if (!isArrowClick) {
+              e.domEvent.stopPropagation();
+            }
+          }}
+        >
+          {item.children.map(child => (
+            <Menu.Item key={child.key}>
+              <Link to={child.path}>
+                {child.icon && child.icon}
+                <span>{child.label}</span>
+              </Link>
+            </Menu.Item>
+          ))}
+        </SubMenu>
+      );
+    }
+
     const content = (
       <Menu.Item key={item.key} icon={item.icon}>
         <Link to={item.path}>{item.label}</Link>
@@ -125,6 +190,7 @@ const Sidebar = ({ collapsed }) => {
         theme="dark"
         mode="inline"
         selectedKeys={[location.pathname.split('/')[1] || 'dashboard']}
+        defaultOpenKeys={['leaves']}
       >
         {menuItems.map(renderMenuItem)}
         {/* <Menu.Item key="profile" icon={<UserOutlined />}>

@@ -1,29 +1,29 @@
 const express = require('express');
 const router = express.Router();
 const {
-  createPayroll,
   generatePayroll,
-  getPayrolls,
+  getAllPayrolls,
+  getMyPayroll,
   getPayrollById,
-  updatePayroll,
+  updatePayrollStatus,
   deletePayroll,
-  getPayrollStats,
 } = require('../controllers/payrollController');
 const { protect, admin } = require('../middleware/authMiddleware');
 
+// Admin routes
 router.route('/')
-  .post(protect, createPayroll)
-  .get(protect, getPayrolls);
+  .get(protect, admin, getAllPayrolls);
 
 router.route('/generate')
   .post(protect, admin, generatePayroll);
 
-router.route('/stats')
-  .get(protect, admin, getPayrollStats);
+// Employee routes - specific routes before parameter routes
+router.get('/my-payroll', protect, getMyPayroll);
 
+// Parameter routes should come last
 router.route('/:id')
   .get(protect, getPayrollById)
-  .put(protect, admin, updatePayroll)
+  .put(protect, admin, updatePayrollStatus)
   .delete(protect, admin, deletePayroll);
 
 module.exports = router; 

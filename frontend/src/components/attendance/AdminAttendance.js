@@ -135,10 +135,10 @@ const AdminAttendance = () => {
 
         <Space>
           <DatePicker
-            value={dateFilter}
+          value={dateFilter}
             onChange={setDateFilter}
             allowClear={false}
-          />
+        />
           {error && <Alert message={error} type="error" showIcon />}
         </Space>
 
@@ -151,11 +151,11 @@ const AdminAttendance = () => {
               emptyText: <Empty description="No attendance records found for this date" />,
             }}
             scroll={{ x: true }}
-          />
+                    />
         </Card>
       </Space>
     </div>
   );
 };
 
-export default AdminAttendance;
+export default AdminAttendance; 

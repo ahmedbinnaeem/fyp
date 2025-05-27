@@ -18,6 +18,9 @@ import {
   message,
   Divider,
   InputNumber,
+  Tag,
+  Tooltip,
+  Popconfirm
 } from 'antd';
 import {
   EditOutlined,
@@ -25,9 +28,13 @@ import {
   PlusOutlined,
   DollarOutlined,
   CalendarOutlined,
+  SyncOutlined,
+  CheckOutlined,
+  CloseOutlined
 } from '@ant-design/icons';
 import api from '../utils/axios';
 import dayjs from 'dayjs';
+import { formatCurrency } from '../utils/format';
 
 const { Title } = Typography;
 const { Option } = Select;
@@ -56,6 +63,9 @@ const Payroll = () => {
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [employees, setEmployees] = useState([]);
   const [form] = Form.useForm();
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [statusUpdateVisible, setStatusUpdateVisible] = useState(false);
+  const [updateForm] = Form.useForm();
 
   const fetchPayrolls = useCallback(async () => {
     try {
@@ -91,15 +101,15 @@ const Payroll = () => {
     setSelectedPayroll(payroll);
     if (payroll) {
       form.setFieldsValue({
-        employee: payroll.employee._id,
+        employee: payroll.user._id,
         basicSalary: payroll.basicSalary,
-        'allowances.housing': payroll.allowances.housing || '',
-        'allowances.transport': payroll.allowances.transport || '',
-        'allowances.meal': payroll.allowances.meal || '',
-        'allowances.other': payroll.allowances.other || '',
-        'deductions.tax': payroll.deductions.tax || '',
-        'deductions.insurance': payroll.deductions.insurance || '',
-        'deductions.other': payroll.deductions.other || '',
+        'allowances.housing': payroll.allowances?.housing || '',
+        'allowances.transport': payroll.allowances?.transport || '',
+        'allowances.meal': payroll.allowances?.meal || '',
+        'allowances.other': payroll.allowances?.other || '',
+        'deductions.tax': payroll.deductions?.tax || '',
+        'deductions.insurance': payroll.deductions?.insurance || '',
+        'deductions.other': payroll.deductions?.other || '',
         month: payroll.month,
         year: payroll.year,
       });
@@ -204,11 +214,49 @@ const Payroll = () => {
     return Object.values(deductions).reduce((sum, value) => sum + (Number(value) || 0), 0);
   };
 
+  const getStatusTag = (status) => {
+    const colors = {
+      DRAFT: 'default',
+      PENDING: 'warning',
+      PROCESSING: 'processing',
+      PAID: 'success',
+      REJECTED: 'error'
+    };
+    
+    const displayStatus = (status || 'DRAFT').toUpperCase();
+    return <Tag color={colors[displayStatus]}>{displayStatus}</Tag>;
+  };
+
+  const handleBulkStatusUpdate = async (values) => {
+    try {
+      setLoading(true);
+      const promises = selectedRows.map(id => 
+        api.put(`/payroll/${id}`, {
+          status: values.status,
+          paymentDate: values.paymentDate?.toISOString(),
+          paymentMethod: values.paymentMethod,
+          remarks: values.remarks
+        })
+      );
+
+      await Promise.all(promises);
+      message.success('Successfully updated payroll status');
+      setStatusUpdateVisible(false);
+      setSelectedRows([]);
+      updateForm.resetFields();
+      fetchPayrolls();
+    } catch (err) {
+      message.error(err.response?.data?.message || 'Failed to update payroll status');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const columns = [
     {
       title: 'Employee',
       key: 'employee',
-      render: (_, record) => `${record.employee.firstName} ${record.employee.lastName}`,
+      render: (_, record) => record?.user ? `${record.user.firstName} ${record.user.lastName}` : '-',
     },
     {
       title: 'Basic Salary',
@@ -256,6 +304,98 @@ const Payroll = () => {
     },
   ];
 
+  const rowSelection = {
+    selectedRowKeys: selectedRows,
+    onChange: (selectedRowKeys) => {
+      setSelectedRows(selectedRowKeys);
+    },
+    getCheckboxProps: (record) => ({
+      disabled: record.status === 'REJECTED' // Can't update rejected payrolls
+    })
+  };
+
+  const statusUpdateModal = (
+    <Modal
+      title="Update Payroll Status"
+      visible={statusUpdateVisible}
+      onCancel={() => {
+        setStatusUpdateVisible(false);
+        updateForm.resetFields();
+      }}
+      footer={null}
+    >
+      <Form
+        form={updateForm}
+        onFinish={handleBulkStatusUpdate}
+        layout="vertical"
+      >
+        <Form.Item
+          name="status"
+          label="Status"
+          rules={[{ required: true, message: 'Please select status' }]}
+        >
+          <Select>
+            <Option value="Pending">Pending</Option>
+            <Option value="Processing">Processing</Option>
+            <Option value="Paid">Paid</Option>
+            <Option value="Rejected">Rejected</Option>
+          </Select>
+        </Form.Item>
+
+        <Form.Item
+          name="paymentMethod"
+          label="Payment Method"
+          rules={[
+            { 
+              required: values => values.status === 'Paid',
+              message: 'Please select payment method'
+            }
+          ]}
+        >
+          <Select>
+            <Option value="Bank Transfer">Bank Transfer</Option>
+            <Option value="Cash">Cash</Option>
+            <Option value="Check">Check</Option>
+          </Select>
+        </Form.Item>
+
+        <Form.Item
+          name="paymentDate"
+          label="Payment Date"
+          rules={[
+            { 
+              required: values => values.status === 'Paid',
+              message: 'Please select payment date'
+            }
+          ]}
+        >
+          <DatePicker style={{ width: '100%' }} />
+        </Form.Item>
+
+        <Form.Item
+          name="remarks"
+          label="Remarks"
+        >
+          <Input.TextArea rows={4} />
+        </Form.Item>
+
+        <Form.Item>
+          <Space>
+            <Button type="primary" htmlType="submit" loading={loading}>
+              Update Status
+            </Button>
+            <Button onClick={() => {
+              setStatusUpdateVisible(false);
+              updateForm.resetFields();
+            }}>
+              Cancel
+            </Button>
+          </Space>
+        </Form.Item>
+      </Form>
+    </Modal>
+  );
+
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
@@ -271,23 +411,31 @@ const Payroll = () => {
   return (
     <div style={{ padding: 24 }}>
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Title level={2}>Payroll Management</Title>
-          <Space>
-            <DatePicker
-              picker="month"
-              value={dayjs(selectedMonth)}
-              onChange={(date) => setSelectedMonth(date.toDate())}
-              allowClear={false}
-            />
-            <Button type="primary" onClick={handleGeneratePayroll}>
-              Generate Payroll
-            </Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => handleOpenModal()}>
-              Add Payroll
-            </Button>
-          </Space>
-        </div>
+        <Row justify="space-between" align="middle">
+          <Col>
+            <Title level={2}>Payroll Management</Title>
+          </Col>
+          <Col>
+            <Space>
+              <Button
+                type="primary"
+                icon={<SyncOutlined />}
+                onClick={fetchPayrolls}
+                loading={loading}
+              >
+                Refresh
+              </Button>
+              <Button
+                type="primary"
+                icon={<DollarOutlined />}
+                onClick={() => setStatusUpdateVisible(true)}
+                disabled={selectedRows.length === 0}
+              >
+                Update Status ({selectedRows.length})
+              </Button>
+            </Space>
+          </Col>
+        </Row>
 
         <Row gutter={16}>
           <Col span={8}>
@@ -323,145 +471,15 @@ const Payroll = () => {
 
         <Card>
           <Table
+            rowSelection={rowSelection}
             columns={columns}
             dataSource={payrolls}
             rowKey="_id"
-            scroll={{ x: true }}
+            loading={loading}
           />
         </Card>
 
-        <Modal
-          title={selectedPayroll ? 'Edit Payroll' : 'New Payroll'}
-          open={modalVisible}
-          onCancel={handleCloseModal}
-          footer={null}
-          width={800}
-        >
-          <Form
-            form={form}
-            layout="vertical"
-            onFinish={handleSubmit}
-          >
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-              name="employee"
-              label="Employee"
-                  rules={[{ required: true, message: 'Please select an employee' }]}
-                >
-                  <Select>
-                    {employees.map((emp) => (
-                      <Option key={emp._id} value={emp._id}>
-                        {emp.firstName} {emp.lastName}
-                      </Option>
-              ))}
-                  </Select>
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-              name="basicSalary"
-              label="Basic Salary"
-                  rules={[{ required: true, message: 'Please enter basic salary' }]}
-                >
-                  <InputNumber
-                    style={{ width: '100%' }}
-                    formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                    parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
-                  />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Divider>Allowances</Divider>
-
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item name="allowances.housing" label="Housing Allowance">
-                  <InputNumber
-                    style={{ width: '100%' }}
-                    formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                    parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
-                />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item name="allowances.transport" label="Transport Allowance">
-                  <InputNumber
-                    style={{ width: '100%' }}
-                    formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                    parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
-                />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item name="allowances.meal" label="Meal Allowance">
-                  <InputNumber
-                    style={{ width: '100%' }}
-                    formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                    parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
-                />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item name="allowances.other" label="Other Allowances">
-                  <InputNumber
-                    style={{ width: '100%' }}
-                    formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                    parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
-                />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Divider>Deductions</Divider>
-
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item name="deductions.tax" label="Tax">
-                  <InputNumber
-                    style={{ width: '100%' }}
-                    formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                    parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
-                />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item name="deductions.insurance" label="Insurance">
-                  <InputNumber
-                    style={{ width: '100%' }}
-                    formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                    parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
-            />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={16}>
-              <Col span={24}>
-                <Form.Item name="deductions.other" label="Other Deductions">
-                  <InputNumber
-                    style={{ width: '100%' }}
-                    formatter={(value) => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                    parser={(value) => value.replace(/\$\s?|(,*)/g, '')}
-            />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Form.Item>
-              <Space>
-                <Button type="primary" htmlType="submit">
-                  {selectedPayroll ? 'Update' : 'Create'}
-          </Button>
-                <Button onClick={handleCloseModal}>Cancel</Button>
-              </Space>
-            </Form.Item>
-          </Form>
-        </Modal>
+        {statusUpdateModal}
       </Space>
     </div>
   );

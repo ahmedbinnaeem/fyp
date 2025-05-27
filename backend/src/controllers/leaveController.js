@@ -1,4 +1,6 @@
 const Leave = require('../models/Leave');
+const LeaveBalance = require('../models/LeaveBalance');
+const Setting = require('../models/Setting');
 
 // @desc    Get all leaves
 // @route   GET /api/leaves
@@ -39,10 +41,105 @@ const createLeave = async (req, res) => {
     const start = new Date(startDate);
     const end = new Date(endDate);
     let duration = 0;
-    for (let d = start; d <= end; d.setDate(d.getDate() + 1)) {
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       if (d.getDay() !== 0 && d.getDay() !== 6) {
         duration++;
       }
+    }
+
+    // Check leave balance
+    const currentYear = new Date().getFullYear();
+    let balance = await LeaveBalance.findOne({
+      user: req.user._id,
+      year: currentYear
+    });
+
+    if (!balance) {
+      const settings = await Setting.findOne();
+      balance = await LeaveBalance.create({
+        user: req.user._id,
+        year: currentYear,
+        annualLeaveBalance: settings.leaveSettings.annualLeaveQuota,
+        sickLeaveBalance: settings.leaveSettings.sickLeaveQuota,
+        carryForward: 0
+      });
+    }
+
+    // Get approved and pending leaves for the year
+    const leaves = await Leave.find({
+      user: req.user._id,
+      status: { $in: ['Approved', 'Pending'] },
+      startDate: {
+        $gte: new Date(currentYear, 0, 1),
+        $lte: new Date(currentYear, 11, 31)
+      }
+    });
+
+    // Calculate used and pending leaves
+    const leaveStats = {
+      annual: { used: 0, pending: 0 },
+      sick: { used: 0, pending: 0 },
+      personal: { used: 0, pending: 0 },
+      maternity: { used: 0, pending: 0 },
+      paternity: { used: 0, pending: 0 },
+      unpaid: { used: 0, pending: 0 }
+    };
+
+    leaves.forEach(leave => {
+      const type = leave.leaveType.toLowerCase().replace(' leave', '');
+      if (leave.status === 'Approved') {
+        leaveStats[type].used += leave.duration;
+      } else if (leave.status === 'Pending') {
+        leaveStats[type].pending += leave.duration;
+      }
+    });
+
+    // Check if enough balance is available (including pending leaves)
+    const type = leaveType.toLowerCase().replace(' leave', '');
+    let quota = 0;
+    let used = 0;
+    let pending = 0;
+
+    switch (type) {
+      case 'annual':
+        quota = balance.annualLeaveBalance + balance.carryForward;
+        used = leaveStats.annual.used;
+        pending = leaveStats.annual.pending;
+        break;
+      case 'sick':
+        quota = balance.sickLeaveBalance;
+        used = leaveStats.sick.used;
+        pending = leaveStats.sick.pending;
+        break;
+      case 'personal':
+        quota = 5; // You might want to make this configurable in settings
+        used = leaveStats.personal.used;
+        pending = leaveStats.personal.pending;
+        break;
+      case 'maternity':
+        quota = 90; // You might want to make this configurable in settings
+        used = leaveStats.maternity.used;
+        pending = leaveStats.maternity.pending;
+        break;
+      case 'paternity':
+        quota = 14; // You might want to make this configurable in settings
+        used = leaveStats.paternity.used;
+        pending = leaveStats.paternity.pending;
+        break;
+      case 'unpaid':
+        quota = 30; // You might want to make this configurable in settings
+        used = leaveStats.unpaid.used;
+        pending = leaveStats.unpaid.pending;
+        break;
+      default:
+        return res.status(400).json({ message: 'Invalid leave type' });
+    }
+
+    const remaining = quota - used - pending;
+    if (duration > remaining) {
+      return res.status(400).json({
+        message: `Insufficient ${type} leave balance. Available: ${remaining} days (${pending} days pending), Requested: ${duration} days`
+      });
     }
 
     const leave = await Leave.create({
@@ -153,7 +250,7 @@ const deleteLeave = async (req, res) => {
       return res.status(401).json({ message: 'Not authorized' });
     }
 
-    await leave.remove();
+    await leave.deleteOne();
     res.json({ message: 'Leave removed' });
   } catch (error) {
     res.status(500).json({ message: error.message });

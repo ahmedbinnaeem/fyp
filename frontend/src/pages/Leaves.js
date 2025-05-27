@@ -122,11 +122,11 @@ const Leaves = () => {
   };
 
   const handleDelete = async (id) => {
-    try {
-      await api.delete(`/leaves/${id}`);
+      try {
+        await api.delete(`/leaves/${id}`);
       message.success('Leave request deleted successfully');
-      fetchLeaves();
-    } catch (err) {
+        fetchLeaves();
+      } catch (err) {
       message.error(err.response?.data?.message || 'Failed to delete leave request');
     }
   };
@@ -276,7 +276,7 @@ const Leaves = () => {
         open={modalVisible}
         onCancel={handleCloseModal}
         footer={null}
-      >
+                      >
         <Form
           form={form}
           layout="vertical"
@@ -286,10 +286,10 @@ const Leaves = () => {
           }}
         >
           <Form.Item
-            name="leaveType"
-            label="Leave Type"
+              name="leaveType"
+              label="Leave Type"
             rules={[{ required: true, message: 'Please select leave type' }]}
-          >
+            >
             <Select>
               {leaveTypes.map((type) => (
                 <Select.Option key={type} value={type}>
@@ -308,8 +308,8 @@ const Leaves = () => {
           </Form.Item>
 
           <Form.Item
-            name="reason"
-            label="Reason"
+              name="reason"
+              label="Reason"
             rules={[{ required: true, message: 'Please enter reason for leave' }]}
           >
             <TextArea rows={4} />
@@ -318,8 +318,8 @@ const Leaves = () => {
           <Form.Item>
             <Space>
               <Button type="primary" htmlType="submit">
-                {selectedLeave ? 'Update' : 'Submit'}
-              </Button>
+            {selectedLeave ? 'Update' : 'Submit'}
+          </Button>
               <Button onClick={handleCloseModal}>Cancel</Button>
             </Space>
           </Form.Item>

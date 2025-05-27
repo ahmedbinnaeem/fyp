@@ -1,16 +1,27 @@
 const mongoose = require('mongoose');
 
 const allowanceSchema = new mongoose.Schema({
-  housing: { type: Number, default: 0 },
-  transport: { type: Number, default: 0 },
-  meal: { type: Number, default: 0 },
-  other: { type: Number, default: 0 }
+  type: {
+    type: String,
+    required: true
+  },
+  amount: {
+    type: Number,
+    required: true
+  },
+  description: String
 }, { _id: false });
 
 const deductionSchema = new mongoose.Schema({
-  tax: { type: Number, default: 0 },
-  insurance: { type: Number, default: 0 },
-  other: { type: Number, default: 0 }
+  type: {
+    type: String,
+    required: true
+  },
+  amount: {
+    type: Number,
+    required: true
+  },
+  description: String
 }, { _id: false });
 
 const payrollSchema = new mongoose.Schema({
@@ -33,63 +44,80 @@ const payrollSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
-  allowances: {
-    type: allowanceSchema,
-    required: true,
-    default: () => ({})
-  },
-  deductions: {
-    type: deductionSchema,
-    required: true,
-    default: () => ({})
-  },
-  overtime: {
-    hours: { type: Number, default: 0 },
-    rate: { type: Number, default: 0 },
-    amount: { type: Number, default: 0 }
-  },
-  bonus: {
+  overtimeHours: {
     type: Number,
     default: 0
   },
+  overtimeRate: {
+    type: Number,
+    default: 1.5
+  },
+  overtimeAmount: {
+    type: Number,
+    default: 0
+  },
+  deductions: {
+    type: [deductionSchema],
+    default: []
+  },
+  allowances: {
+    type: [allowanceSchema],
+    default: []
+  },
+  taxAmount: {
+    type: Number,
+    default: 0
+  },
+  grossSalary: {
+    type: Number,
+    default: function() {
+      return this.basicSalary || 0;
+    }
+  },
   netSalary: {
     type: Number,
-    required: true
+    default: function() {
+      return this.basicSalary || 0;
+    }
   },
   status: {
     type: String,
-    enum: ['pending', 'processed', 'paid'],
-    default: 'pending'
+    enum: ['Draft', 'Pending', 'Processing', 'Paid', 'Rejected'],
+    default: 'Draft'
   },
-  paymentDate: Date,
+  paymentDate: {
+    type: Date
+  },
   paymentMethod: {
     type: String,
-    enum: ['bank_transfer', 'check', 'cash'],
-    default: 'bank_transfer'
+    enum: ['Bank Transfer', 'Cash', 'Check']
   },
-  bankDetails: {
-    bankName: String,
-    accountNumber: String,
-    accountName: String
-  },
-  comments: String
+  remarks: String
 }, {
   timestamps: true
 });
 
-// Index for efficient querying
-payrollSchema.index({ user: 1, year: 1, month: 1 }, { unique: true });
+// Create a compound index for user, month, and year to ensure unique monthly records
+payrollSchema.index({ user: 1, month: 1, year: 1 }, { unique: true });
 
-// Virtual for calculating total allowances
-payrollSchema.virtual('totalAllowances').get(function() {
-  const { housing, transport, meal, other } = this.allowances;
-  return (housing || 0) + (transport || 0) + (meal || 0) + (other || 0);
-});
+// Calculate overtime amount and gross/net salary before saving
+payrollSchema.pre('save', function(next) {
+  // Calculate overtime amount
+  this.overtimeAmount = this.overtimeHours * (this.basicSalary / 160) * this.overtimeRate;
 
-// Virtual for calculating total deductions
-payrollSchema.virtual('totalDeductions').get(function() {
-  const { tax, insurance, other } = this.deductions;
-  return (tax || 0) + (insurance || 0) + (other || 0);
+  // Calculate total allowances
+  const totalAllowances = this.allowances.reduce((sum, allowance) => sum + allowance.amount, 0) || 0;
+
+  // Calculate total deductions
+  const totalDeductions = this.deductions.reduce((sum, deduction) => sum + deduction.amount, 0) || 0;
+
+  // Calculate gross salary
+  this.grossSalary = this.basicSalary + this.overtimeAmount + totalAllowances;
+
+  // Calculate net salary
+  this.netSalary = this.grossSalary - totalDeductions - this.taxAmount;
+
+  next();
 });
 
 const Payroll = mongoose.model('Payroll', payrollSchema);

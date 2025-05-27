@@ -42,6 +42,26 @@ const settingSchema = new mongoose.Schema({
       required: true,
       default: 7,
     },
+    personalLeaveQuota: {
+      type: Number,
+      required: true,
+      default: 5,
+    },
+    maternityLeaveQuota: {
+      type: Number,
+      required: true,
+      default: 90,
+    },
+    paternityLeaveQuota: {
+      type: Number,
+      required: true,
+      default: 14,
+    },
+    unpaidLeaveQuota: {
+      type: Number,
+      required: true,
+      default: 30,
+    },
     carryForwardLimit: {
       type: Number,
       required: true,

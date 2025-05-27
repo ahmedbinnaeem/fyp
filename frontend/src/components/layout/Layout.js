@@ -43,7 +43,7 @@ const Layout = () => {
               <Breadcrumb.Item key={index}>{breadcrumb.title}</Breadcrumb.Item>
             ))}
           </Breadcrumb>
-          <Outlet />
+        <Outlet />
         </Content>
       </AntLayout>
     </AntLayout>

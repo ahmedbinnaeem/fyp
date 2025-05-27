@@ -13,6 +13,10 @@ import {
   Popconfirm,
   message,
   InputNumber,
+  Select,
+  Row,
+  Col,
+  Tag,
 } from 'antd';
 import {
   EditOutlined,
@@ -22,6 +26,7 @@ import {
 import api from '../utils/axios';
 
 const { Title } = Typography;
+const { Option } = Select;
 
 const Employees = () => {
   const [employees, setEmployees] = useState([]);
@@ -29,6 +34,7 @@ const Employees = () => {
   const [error, setError] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [settings, setSettings] = useState(null);
   const [form] = Form.useForm();
 
   const fetchEmployees = async () => {
@@ -45,20 +51,35 @@ const Employees = () => {
     }
   };
 
+  const fetchSettings = async () => {
+    try {
+      const response = await api.get('/settings');
+      setSettings(response.data);
+    } catch (error) {
+      message.error('Failed to fetch company settings');
+    }
+  };
+
   useEffect(() => {
     fetchEmployees();
+    fetchSettings();
   }, []);
 
   const handleOpenModal = (employee = null) => {
     setSelectedEmployee(employee);
     if (employee) {
+      const domain = settings?.companyName ? 
+        `@${settings.companyName.toLowerCase().replace(/\s+/g, '')}.com` : '';
+      const username = employee.email.replace(domain, '');
+      
       form.setFieldsValue({
         firstName: employee.firstName,
         lastName: employee.lastName,
-        email: employee.email,
+        email: username,
         position: employee.position,
         department: employee.department,
         basicSalary: employee.basicSalary,
+        gender: employee.gender,
       });
     } else {
       form.resetFields();
@@ -74,11 +95,24 @@ const Employees = () => {
 
   const handleSubmit = async (values) => {
     try {
+      if (!settings?.companyName) {
+        message.error('Company settings not configured');
+        return;
+      }
+
+      const domain = `@${settings.companyName.toLowerCase().replace(/\s+/g, '')}.com`;
+      const fullEmail = values.email + domain;
+      
+      const submitData = {
+        ...values,
+        email: fullEmail
+      };
+
       if (selectedEmployee) {
-        await api.put(`/users/${selectedEmployee._id}`, values);
+        await api.put(`/users/${selectedEmployee._id}`, submitData);
         message.success('Employee updated successfully');
       } else {
-        await api.post('/users', values);
+        await api.post('/users', submitData);
         message.success('Employee added successfully');
       }
       handleCloseModal();
@@ -89,18 +123,35 @@ const Employees = () => {
   };
 
   const handleDelete = async (id) => {
-    try {
-      await api.delete(`/users/${id}`);
+      try {
+        await api.delete(`/users/${id}`);
       message.success('Employee deleted successfully');
-      fetchEmployees();
-    } catch (err) {
+        fetchEmployees();
+      } catch (err) {
       message.error(err.response?.data?.message || 'Failed to delete employee');
     }
+  };
+
+  const validateEmail = (_, value) => {
+    if (!value) {
+      return Promise.reject('Please enter username');
+    }
+
+    if (!settings || !settings.companyName) {
+      return Promise.reject('Company settings not configured');
+    }
+
+    if (!/^[a-zA-Z0-9._-]+$/.test(value)) {
+      return Promise.reject('Username can only contain letters, numbers, dots, underscores and hyphens');
+    }
+
+    return Promise.resolve();
   };
 
   const columns = [
     {
       title: 'Name',
+      dataIndex: 'firstName',
       key: 'name',
       render: (_, record) => `${record.firstName} ${record.lastName}`,
     },
@@ -110,14 +161,24 @@ const Employees = () => {
       key: 'email',
     },
     {
+      title: 'Department',
+      dataIndex: 'department',
+      key: 'department',
+    },
+    {
       title: 'Position',
       dataIndex: 'position',
       key: 'position',
     },
     {
-      title: 'Department',
-      dataIndex: 'department',
-      key: 'department',
+      title: 'Gender',
+      dataIndex: 'gender',
+      key: 'gender',
+      render: (gender) => (
+        <Tag color={gender === 'Male' ? 'blue' : 'pink'}>
+          {gender}
+        </Tag>
+      ),
     },
     {
       title: 'Basic Salary',
@@ -165,13 +226,13 @@ const Employees = () => {
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Title level={2}>Employees Management</Title>
-          <Button
+        <Button
             type="primary"
             icon={<PlusOutlined />}
             onClick={() => handleOpenModal()}
-          >
-            Add Employee
-          </Button>
+        >
+          Add Employee
+        </Button>
         </div>
 
         <Card>
@@ -194,32 +255,57 @@ const Employees = () => {
             form={form}
             layout="vertical"
             onFinish={handleSubmit}
+            initialValues={selectedEmployee || {}}
           >
-            <Form.Item
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
               name="firstName"
               label="First Name"
-              rules={[{ required: true, message: 'Please enter first name' }]}
-            >
-              <Input />
-            </Form.Item>
-
-            <Form.Item
+                  rules={[{ required: true, message: 'Please enter first name' }]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
               name="lastName"
               label="Last Name"
-              rules={[{ required: true, message: 'Please enter last name' }]}
+                  rules={[{ required: true, message: 'Please enter last name' }]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Form.Item
+              name="gender"
+              label="Gender"
+              rules={[{ required: true, message: 'Please select gender' }]}
             >
-              <Input />
+              <Select>
+                <Option value="Male">Male</Option>
+                <Option value="Female">Female</Option>
+              </Select>
             </Form.Item>
 
             <Form.Item
               name="email"
-              label="Email"
+              label="Email Username"
               rules={[
-                { required: true, message: 'Please enter email' },
-                { type: 'email', message: 'Please enter a valid email' },
+                { required: true, message: 'Please enter username' },
+                { validator: validateEmail }
               ]}
+              extra={settings?.companyName ? 
+                `Enter username only - full email will be username@${settings.companyName.toLowerCase().replace(/\s+/g, '')}.com` : 
+                'Loading company settings...'}
             >
-              <Input />
+              <Input 
+                placeholder="username"
+                addonAfter={settings?.companyName ? 
+                  `@${settings.companyName.toLowerCase().replace(/\s+/g, '')}.com` : 
+                  'Loading...'}
+              />
             </Form.Item>
 
             <Form.Item
@@ -253,8 +339,8 @@ const Employees = () => {
 
             {!selectedEmployee && (
               <Form.Item
-                name="password"
-                label="Password"
+              name="password"
+              label="Password"
                 rules={[
                   { required: true, message: 'Please enter password' },
                   { min: 6, message: 'Password must be at least 6 characters' },
@@ -267,8 +353,8 @@ const Employees = () => {
             <Form.Item>
               <Space>
                 <Button type="primary" htmlType="submit">
-                  {selectedEmployee ? 'Update' : 'Add'}
-                </Button>
+            {selectedEmployee ? 'Update' : 'Add'}
+          </Button>
                 <Button onClick={handleCloseModal}>Cancel</Button>
               </Space>
             </Form.Item>

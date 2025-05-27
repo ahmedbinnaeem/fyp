@@ -141,13 +141,13 @@ const Projects = () => {
   };
 
   const handleDelete = async (id) => {
-    try {
-      await api.delete(`/projects/${id}`);
+      try {
+        await api.delete(`/projects/${id}`);
       message.success('Project deleted successfully');
-      fetchProjects();
-    } catch (err) {
+        fetchProjects();
+      } catch (err) {
       message.error(err.response?.data?.message || 'Failed to delete project');
-    }
+      }
   };
 
   const columns = [
@@ -246,17 +246,17 @@ const Projects = () => {
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Title level={2}>
-            {user?.role === 'admin' ? 'All Projects' : 'My Projects'}
+          {user?.role === 'admin' ? 'All Projects' : 'My Projects'}
           </Title>
-          {user?.role === 'admin' && (
-            <Button
+        {user?.role === 'admin' && (
+          <Button
               type="primary"
               icon={<PlusOutlined />}
               onClick={() => handleOpenModal()}
-            >
-              Add Project
-            </Button>
-          )}
+          >
+            Add Project
+          </Button>
+        )}
         </div>
 
         <Card>
@@ -268,7 +268,7 @@ const Projects = () => {
           />
         </Card>
 
-        {user?.role === 'admin' && (
+      {user?.role === 'admin' && (
           <Modal
             title={selectedProject ? 'Edit Project' : 'New Project'}
             open={modalVisible}
@@ -316,7 +316,7 @@ const Projects = () => {
                     <Option key={status} value={status}>
                       {status}
                     </Option>
-                  ))}
+                ))}
                 </Select>
               </Form.Item>
 
@@ -344,7 +344,7 @@ const Projects = () => {
                     <Option key={emp._id} value={emp._id}>
                       {emp.firstName} {emp.lastName}
                     </Option>
-                  ))}
+                ))}
                 </Select>
               </Form.Item>
 
@@ -357,20 +357,20 @@ const Projects = () => {
                   style={{ width: '100%' }}
                   formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                   parser={value => value.replace(/\$\s?|(,*)/g, '')}
-                />
+              />
               </Form.Item>
 
               <Form.Item>
                 <Space>
                   <Button type="primary" htmlType="submit">
                     {selectedProject ? 'Update' : 'Create'}
-                  </Button>
+            </Button>
                   <Button onClick={handleCloseModal}>Cancel</Button>
                 </Space>
               </Form.Item>
             </Form>
           </Modal>
-        )}
+      )}
       </Space>
     </div>
   );

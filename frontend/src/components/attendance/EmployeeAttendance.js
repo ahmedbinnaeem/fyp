@@ -143,10 +143,10 @@ const EmployeeAttendance = () => {
                 value={
                   clockInStatus.isClockedIn
                     ? clockInStatus.isClockedOut
-                      ? 'Completed'
-                      : 'In Progress'
-                    : 'Not Started'
-                }
+                    ? 'Completed'
+                    : 'In Progress'
+                  : 'Not Started'
+              }
                 valueStyle={{
                   color: clockInStatus.isClockedIn
                     ? clockInStatus.isClockedOut
@@ -154,7 +154,7 @@ const EmployeeAttendance = () => {
                       : '#1890ff'
                     : '#8c8c8c',
                 }}
-              />
+            />
             </Col>
             {todayAttendance?.checkIn && (
               <Col xs={24} sm={6}>
@@ -163,7 +163,7 @@ const EmployeeAttendance = () => {
                   value={formatTime(todayAttendance.checkIn.time)}
                 />
               </Col>
-            )}
+          )}
             {todayAttendance?.checkOut?.time && (
               <Col xs={24} sm={6}>
                 <Statistic
@@ -171,7 +171,7 @@ const EmployeeAttendance = () => {
                   value={formatTime(todayAttendance.checkOut.time)}
                 />
               </Col>
-            )}
+          )}
             {todayAttendance?.workingHours && (
               <Col xs={24} sm={6}>
                 <Statistic
@@ -179,29 +179,29 @@ const EmployeeAttendance = () => {
                   value={formatWorkingHours(todayAttendance.workingHours)}
                 />
               </Col>
-            )}
+          )}
             <Col xs={24}>
               <Space>
                 {!clockInStatus.isClockedIn ? (
-                  <Button
+              <Button
                     type="primary"
                     icon={<LoginOutlined />}
-                    onClick={handleClockIn}
+                onClick={handleClockIn}
                     loading={clockInStatus.isLoading}
-                  >
-                    Clock In
-                  </Button>
+              >
+                Clock In
+              </Button>
                 ) : !clockInStatus.isClockedOut ? (
-                  <Button
+              <Button
                     type="primary"
                     danger
                     icon={<LogoutOutlined />}
-                    onClick={handleClockOut}
+                onClick={handleClockOut}
                     loading={clockInStatus.isLoading}
-                  >
-                    Clock Out
-                  </Button>
-                ) : null}
+              >
+                Clock Out
+              </Button>
+            ) : null}
               </Space>
             </Col>
           </Row>
@@ -216,7 +216,7 @@ const EmployeeAttendance = () => {
               emptyText: <Empty description="No attendance records found" />,
             }}
             scroll={{ x: true }}
-          />
+                  />
         </Card>
       </Space>
     </div>

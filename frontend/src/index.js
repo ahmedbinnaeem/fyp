@@ -15,7 +15,7 @@ root.render(
   <React.StrictMode>
     <Provider store={store}>
       <ConfigProvider theme={theme}>
-        <App />
+    <App />
       </ConfigProvider>
     </Provider>
   </React.StrictMode>

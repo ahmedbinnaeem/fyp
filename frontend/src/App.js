@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
 import Projects from './pages/Projects';
 import Leaves from './pages/Leaves';
+import LeaveBalance from './pages/LeaveBalance';
 import Attendance from './pages/Attendance';
 import Payroll from './pages/Payroll';
 import Settings from './pages/Settings';
@@ -16,6 +17,7 @@ import Profile from './pages/Profile';
 import Unauthorized from './pages/Unauthorized';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import { getUserProfile } from './store/slices/authSlice';
+import MyPayroll from './pages/MyPayroll';
 
 const antIcon = <LoadingOutlined style={{ fontSize: 24 }} spin />;
 
@@ -56,19 +58,19 @@ function App() {
 
   return (
     <Router>
-      <Routes>
+    <Routes>
         {/* Public route */}
-        <Route path="/login" element={<Login />} />
+      <Route path="/login" element={<Login />} />
         
         {/* Protected routes */}
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <Layout />
-            </ProtectedRoute>
-          }
-        >
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }
+      >
           {/* Root path redirect */}
           <Route index element={<RootRedirect />} />
 
@@ -81,30 +83,30 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="employees"
-            element={
+        <Route
+          path="employees"
+          element={
               <ProtectedRoute roles={['admin']}>
-                <Employees />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="payroll"
-            element={
+              <Employees />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="payroll"
+          element={
               <ProtectedRoute roles={['admin']}>
-                <Payroll />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="settings"
-            element={
+              <Payroll />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="settings"
+          element={
               <ProtectedRoute roles={['admin']}>
-                <Settings />
-              </ProtectedRoute>
-            }
-          />
+              <Settings />
+            </ProtectedRoute>
+          }
+        />
 
           {/* Routes accessible by all authenticated users */}
           <Route
@@ -118,8 +120,16 @@ function App() {
           <Route
             path="leaves"
             element={
-              <ProtectedRoute roles={['admin', 'team_lead', 'employee']}>
+              <ProtectedRoute>
                 <Leaves />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="leave-balance"
+            element={
+              <ProtectedRoute>
+                <LeaveBalance />
               </ProtectedRoute>
             }
           />
@@ -140,9 +150,17 @@ function App() {
             }
           />
           <Route path="unauthorized" element={<Unauthorized />} />
-        </Route>
-      </Routes>
-    </Router>
+          <Route
+            path="/my-payroll"
+            element={
+              <ProtectedRoute>
+                <MyPayroll />
+              </ProtectedRoute>
+            }
+          />
+      </Route>
+    </Routes>
+      </Router>
   );
 }
 

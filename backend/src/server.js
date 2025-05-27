@@ -27,7 +27,7 @@ app.use('/api/leaves', require('./routes/leaveRoutes'));
 app.use('/api/payroll', require('./routes/payrollRoutes'));
 app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 app.use('/api/settings', require('./routes/settingRoutes'));
-
+app.use('/api/leave-balances', require('./routes/leaveBalanceRoutes'));
 
 const PORT = process.env.PORT || 5000;
 

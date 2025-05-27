@@ -22,6 +22,10 @@ const getSettings = asyncHandler(async (req, res) => {
       leaveSettings: {
         annualLeaveQuota: 14,
         sickLeaveQuota: 7,
+        personalLeaveQuota: 5,
+        maternityLeaveQuota: 90,
+        paternityLeaveQuota: 14,
+        unpaidLeaveQuota: 30,
         carryForwardLimit: 5,
       },
       payrollSettings: {
@@ -52,21 +56,39 @@ const updateSettings = asyncHandler(async (req, res) => {
     throw new Error('Settings not found');
   }
 
+  // Ensure all leave settings are present with their values
+  const leaveSettings = {
+    annualLeaveQuota: Number(req.body.leaveSettings?.annualLeaveQuota),
+    sickLeaveQuota: Number(req.body.leaveSettings?.sickLeaveQuota),
+    personalLeaveQuota: Number(req.body.leaveSettings?.personalLeaveQuota),
+    maternityLeaveQuota: Number(req.body.leaveSettings?.maternityLeaveQuota),
+    paternityLeaveQuota: Number(req.body.leaveSettings?.paternityLeaveQuota),
+    unpaidLeaveQuota: Number(req.body.leaveSettings?.unpaidLeaveQuota),
+    carryForwardLimit: Number(req.body.leaveSettings?.carryForwardLimit)
+  };
+
+  // Validate that all required leave settings are present
+  Object.entries(leaveSettings).forEach(([key, value]) => {
+    if (value === undefined || value === null || isNaN(value)) {
+      leaveSettings[key] = settings.leaveSettings[key];
+    }
+  });
+
+  const updateData = {
+    companyName: req.body.companyName,
+    companyEmail: req.body.companyEmail,
+    companyPhone: req.body.companyPhone,
+    companyAddress: req.body.companyAddress,
+    workingDays: req.body.workingDays,
+    workingHours: req.body.workingHours,
+    leaveSettings: leaveSettings,
+    payrollSettings: req.body.payrollSettings,
+    emailNotifications: req.body.emailNotifications || settings.emailNotifications
+  };
+
   const updatedSettings = await Setting.findOneAndUpdate(
     {},
-    {
-      $set: {
-        companyName: req.body.companyName,
-        companyEmail: req.body.companyEmail,
-        companyPhone: req.body.companyPhone,
-        companyAddress: req.body.companyAddress,
-        workingDays: req.body.workingDays,
-        workingHours: req.body.workingHours,
-        leaveSettings: req.body.leaveSettings,
-        payrollSettings: req.body.payrollSettings,
-        emailNotifications: req.body.emailNotifications,
-      },
-    },
+    { $set: updateData },
     { new: true, runValidators: true }
   );
 
