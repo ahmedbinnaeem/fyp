@@ -12,7 +12,8 @@ import {
   Statistic,
   Form,
   Select,
-  Popconfirm
+  Popconfirm,
+  Alert
 } from 'antd';
 import {
   PlusOutlined,
@@ -40,8 +41,12 @@ const PerformancePage = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
+  console.log('PerformancePage - User:', user);
+  console.log('PerformancePage - Is Admin:', isAdmin);
+
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedReview, setSelectedReview] = useState(null);
   const [modalMode, setModalMode] = useState('create'); // 'create', 'edit', 'view'
@@ -51,12 +56,27 @@ const PerformancePage = () => {
     try {
       setLoading(true);
       console.log('Fetching reviews for user:', user);
-      const response = await api.get('/performance-reviews');
+      
+      // For employees, explicitly pass their user ID
+      const url = isAdmin ? '/performance-reviews' : `/performance-reviews?user=${user._id}`;
+      console.log('Fetching from URL:', url);
+      
+      const response = await api.get(url);
       console.log('API Response:', response.data);
+      
+      if (!response.data) {
+        console.error('No data received from API');
+        setError('No performance reviews found');
+        setReviews([]);
+        return;
+      }
+      
       setReviews(response.data);
     } catch (err) {
-      console.error('Error fetching reviews:', err);
+      console.error('Error fetching reviews:', err.response || err);
+      setError(err.response?.data?.message || 'Failed to fetch performance reviews');
       message.error('Failed to fetch performance reviews');
+      setReviews([]);
     } finally {
       setLoading(false);
     }
@@ -67,7 +87,7 @@ const PerformancePage = () => {
     if (user) {
       fetchReviews();
     }
-  }, [user]);
+  }, [user, isAdmin]); // Added isAdmin to dependencies since we use it in fetchReviews
 
   const handleCreate = () => {
     setModalMode('create');
@@ -281,35 +301,36 @@ const PerformancePage = () => {
       </Row>
 
       <Card>
-        <Tabs defaultActiveKey="all">
-          <TabPane tab="All Reviews" key="all">
-            <PerformanceList
-              reviews={reviews}
-              onView={handleView}
-              onEdit={handleEdit}
-              onDelete={handleDelete}
-              onAcknowledge={handleAcknowledge}
-              isAdmin={isAdmin}
-              loading={loading}
-            />
-          </TabPane>
-          {!isAdmin && (
+        <Tabs defaultActiveKey={isAdmin ? "all" : "my"}>
+          {isAdmin ? (
+            <>
+              <TabPane tab="All Reviews" key="all">
+                <PerformanceList
+                  reviews={reviews}
+                  onView={handleView}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onAcknowledge={handleAcknowledge}
+                  isAdmin={isAdmin}
+                  loading={loading}
+                />
+              </TabPane>
+              <TabPane tab="Pending Reviews" key="pending">
+                <PerformanceList
+                  reviews={reviews.filter(r => r.status === 'Pending')}
+                  onView={handleView}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  onAcknowledge={handleAcknowledge}
+                  isAdmin={isAdmin}
+                  loading={loading}
+                />
+              </TabPane>
+            </>
+          ) : (
             <TabPane tab="My Reviews" key="my">
               <PerformanceList
-                reviews={reviews.filter(r => r.user._id === user._id)}
-                onView={handleView}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onAcknowledge={handleAcknowledge}
-                isAdmin={isAdmin}
-                loading={loading}
-              />
-            </TabPane>
-          )}
-          {isAdmin && (
-            <TabPane tab="Pending Reviews" key="pending">
-              <PerformanceList
-                reviews={reviews.filter(r => r.status === 'Pending')}
+                reviews={reviews}
                 onView={handleView}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
