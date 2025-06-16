@@ -331,11 +331,11 @@ const Payroll = () => {
             icon={<EditOutlined />}
             onClick={() => handleOpenModal(record)}
           />
-          <Button
+          {/* <Button
             type="link"
             icon={<DownloadOutlined />}
             onClick={() => handleDownloadPayslip(record._id)}
-          />
+          /> */}
         </Space>
       ),
     },
