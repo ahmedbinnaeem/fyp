@@ -4,6 +4,7 @@ const morgan = require('morgan');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const { notFound, errorHandler } = require('./middleware/errorMiddleware');
+const performanceRoutes = require('./routes/performanceRoutes');
 
 // Load environment variables
 dotenv.config();
@@ -28,6 +29,7 @@ app.use('/api/payroll', require('./routes/payrollRoutes'));
 app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 app.use('/api/settings', require('./routes/settingRoutes'));
 app.use('/api/leave-balances', require('./routes/leaveBalanceRoutes'));
+app.use('/api/performance-reviews', performanceRoutes);
 
 const PORT = process.env.PORT || 5000;
 

@@ -12,6 +12,7 @@ import {
   SettingOutlined,
   UserOutlined,
   CalculatorOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
 
 const { Sider } = Layout;
@@ -46,14 +47,6 @@ const Sidebar = ({ collapsed }) => {
       icon: <CalendarOutlined />,
       label: 'Leaves',
       path: '/leaves',
-      children: [
-        {
-          key: 'leave-balance',
-          icon: <CalculatorOutlined />,
-          label: 'Leave Balance',
-          path: '/leave-balance',
-        },
-      ],
     },
     {
       key: 'attendance',
@@ -66,6 +59,12 @@ const Sidebar = ({ collapsed }) => {
       icon: <DollarOutlined />,
       label: 'Payroll',
       path: '/payroll',
+    },
+    {
+      key: 'performance',
+      icon: <BarChartOutlined />,
+      label: 'Performance',
+      path: '/performance'
     },
     // {
     //   key: 'settings',
@@ -87,6 +86,12 @@ const Sidebar = ({ collapsed }) => {
       icon: <ProjectOutlined />,
       label: 'Projects',
       path: '/projects',
+    },
+    {
+      key: 'performance',
+      icon: <BarChartOutlined />,
+      label: 'Performance',
+      path: '/performance'
     },
     {
       key: 'leaves',

@@ -117,10 +117,24 @@ const AdminDashboard = ({ data }) => {
     activeProjects: 0,
     pendingLeaves: 0,
     todayAttendance: 0,
-    monthlyPayroll: 0,
+    monthlyPayroll: {
+      totalPayroll: 0,
+      totalDeductions: 0,
+      employeeCount: 0
+    }
   };
 
   const safeStats = { ...defaultStats, ...stats };
+
+  // Format currency
+  const formatCurrency = (value) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+  };
 
   const projectColumns = [
     {
@@ -152,8 +166,8 @@ const AdminDashboard = ({ data }) => {
         <Col xs={24} sm={12} md={8} lg={4.8}>
           <Card>
             <Statistic
-            title="Total Employees"
-            value={safeStats.totalEmployees}
+              title="Total Employees"
+              value={safeStats.totalEmployees}
               prefix={<TeamOutlined />}
               valueStyle={{ color: '#1890ff' }}
             />
@@ -162,8 +176,8 @@ const AdminDashboard = ({ data }) => {
         <Col xs={24} sm={12} md={8} lg={4.8}>
           <Card>
             <Statistic
-            title="Active Projects"
-            value={safeStats.activeProjects}
+              title="Active Projects"
+              value={safeStats.activeProjects}
               prefix={<ProjectOutlined />}
               valueStyle={{ color: '#1890ff' }}
             />
@@ -172,8 +186,8 @@ const AdminDashboard = ({ data }) => {
         <Col xs={24} sm={12} md={8} lg={4.8}>
           <Card>
             <Statistic
-            title="Pending Leaves"
-            value={safeStats.pendingLeaves}
+              title="Pending Leaves"
+              value={safeStats.pendingLeaves}
               prefix={<CalendarOutlined />}
               valueStyle={{ color: '#faad14' }}
             />
@@ -182,8 +196,8 @@ const AdminDashboard = ({ data }) => {
         <Col xs={24} sm={12} md={8} lg={4.8}>
           <Card>
             <Statistic
-            title="Today's Attendance"
-            value={safeStats.todayAttendance}
+              title="Today's Attendance"
+              value={safeStats.todayAttendance}
               prefix={<ClockCircleOutlined />}
               valueStyle={{ color: '#52c41a' }}
             />
@@ -192,10 +206,11 @@ const AdminDashboard = ({ data }) => {
         <Col xs={24} sm={12} md={8} lg={4.8}>
           <Card>
             <Statistic
-            title="Monthly Payroll"
-              value={safeStats.monthlyPayroll}
+              title="Monthly Payroll"
+              value={safeStats.monthlyPayroll.totalPayroll}
               prefix={<DollarOutlined />}
               valueStyle={{ color: '#52c41a' }}
+              formatter={(value) => formatCurrency(value)}
             />
           </Card>
         </Col>

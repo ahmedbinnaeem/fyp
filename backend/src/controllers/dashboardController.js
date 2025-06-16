@@ -55,32 +55,45 @@ const getAdminDashboardStats = async (req, res) => {
         },
       },
       {
+        $addFields: {
+          totalAllowances: {
+            $reduce: {
+              input: '$allowances',
+              initialValue: 0,
+              in: { $add: ['$$value', '$$this.amount'] }
+            }
+          },
+          totalDeductions: {
+            $reduce: {
+              input: '$deductions',
+              initialValue: 0,
+              in: { $add: ['$$value', '$$this.amount'] }
+            }
+          }
+        }
+      },
+      {
         $group: {
           _id: null,
           total: {
             $sum: {
-              $subtract: [
-                {
-                  $add: [
-                    '$basicSalary',
-                    { $add: [
-                      '$allowances.housing',
-                      '$allowances.transport',
-                      '$allowances.meal',
-                      '$allowances.other'
-                    ]}
-                  ]
-                },
-                {
-                  $add: [
-                    '$deductions.tax',
-                    '$deductions.insurance',
-                    '$deductions.other'
-                  ]
-                }
+              $add: [
+                '$basicSalary',
+                '$totalAllowances',
+                { $multiply: ['$overtimeHours', { $divide: ['$basicSalary', 160] }, '$overtimeRate'] }
               ]
             }
-          }
+          },
+          totalDeductions: { $sum: { $add: ['$totalDeductions', '$taxAmount'] } },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          totalPayroll: { $subtract: ['$total', '$totalDeductions'] },
+          totalDeductions: 1,
+          employeeCount: '$count'
         }
       }
     ]);
@@ -113,7 +126,11 @@ const getAdminDashboardStats = async (req, res) => {
         activeProjects,
         pendingLeaves,
         todayAttendance,
-        monthlyPayroll: monthlyPayroll[0]?.total || 0,
+        monthlyPayroll: monthlyPayroll[0] || {
+          totalPayroll: 0,
+          totalDeductions: 0,
+          employeeCount: 0
+        }
       },
       recentProjects,
       recentActivities: {

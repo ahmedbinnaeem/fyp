@@ -30,24 +30,58 @@ const createPayroll = async (req, res) => {
       return res.status(400).json({ message: 'Payroll already exists for this month' });
     }
 
+    // Format allowances as array of objects
+    const formattedAllowances = [
+      {
+        type: 'Housing',
+        amount: Number(allowances?.housing || 0),
+        description: 'Housing allowance'
+      },
+      {
+        type: 'Transport',
+        amount: Number(allowances?.transport || 0),
+        description: 'Transport allowance'
+      },
+      {
+        type: 'Meal',
+        amount: Number(allowances?.meal || 0),
+        description: 'Meal allowance'
+      },
+      {
+        type: 'Other',
+        amount: Number(allowances?.other || 0),
+        description: 'Other allowances'
+      }
+    ].filter(allowance => allowance.amount > 0); // Only include non-zero allowances
+
+    // Format deductions as array of objects
+    const formattedDeductions = [
+      {
+        type: 'Tax',
+        amount: Number(deductions?.tax || 0),
+        description: 'Income tax'
+      },
+      {
+        type: 'Insurance',
+        amount: Number(deductions?.insurance || 0),
+        description: 'Health insurance'
+      },
+      {
+        type: 'Other',
+        amount: Number(deductions?.other || 0),
+        description: 'Other deductions'
+      }
+    ].filter(deduction => deduction.amount > 0); // Only include non-zero deductions
+
     // Create new payroll with validated data
     const payroll = await Payroll.create({
       user: employee,
       month: Number(month),
       year: Number(year),
       basicSalary: Number(basicSalary),
-      allowances: {
-        housing: Number(allowances.housing || 0),
-        transport: Number(allowances.transport || 0),
-        meal: Number(allowances.meal || 0),
-        other: Number(allowances.other || 0)
-      },
-      deductions: {
-        tax: Number(deductions.tax || 0),
-        insurance: Number(deductions.insurance || 0),
-        other: Number(deductions.other || 0)
-      },
-      netSalary: Number(netSalary)
+      allowances: formattedAllowances,
+      deductions: formattedDeductions,
+      status: 'Draft'
     });
 
     const populatedPayroll = await Payroll.findById(payroll._id)
@@ -59,11 +93,11 @@ const createPayroll = async (req, res) => {
   }
 };
 
-// @desc    Generate monthly payroll for an employee
+// @desc    Generate monthly payroll for all employees
 // @route   POST /api/payroll/generate
 // @access  Private/Admin
 const generatePayroll = asyncHandler(async (req, res) => {
-  const { userId, month, year, basicSalary, overtimeHours = 0, allowances = [], deductions = [] } = req.body;
+  const { month, year } = req.body;
 
   // Validate month and year
   const currentDate = new Date();
@@ -72,12 +106,11 @@ const generatePayroll = asyncHandler(async (req, res) => {
     throw new Error('Cannot generate payroll for future dates');
   }
 
-  // Check if payroll already exists
-  const existingPayroll = await Payroll.findOne({ user: userId, month, year });
-  if (existingPayroll) {
-    res.status(400);
-    throw new Error('Payroll already exists for this month');
-  }
+  // Get all active employees
+  const employees = await User.find({ 
+    role: { $ne: 'admin' },
+    joiningDate: { $exists: true, $ne: null } // Only include employees with joining date
+  });
 
   // Get settings for tax rate and overtime rate
   const settings = await Setting.findOne();
@@ -86,24 +119,140 @@ const generatePayroll = asyncHandler(async (req, res) => {
     throw new Error('System settings not configured');
   }
 
-  // Calculate tax amount
-  const taxAmount = (basicSalary * settings.payrollSettings.taxRate) / 100;
+  // If no employees found, return empty array with message
+  if (!employees.length) {
+    return res.status(200).json({
+      message: 'No eligible employees found for payroll generation',
+      payrolls: []
+    });
+  }
 
-  // Create payroll record
-  const payroll = await Payroll.create({
-    user: userId,
-    month,
-    year,
-    basicSalary,
-    overtimeHours,
-    overtimeRate: settings.payrollSettings.overtimeRate,
-    allowances,
-    deductions,
-    taxAmount,
-    status: 'Draft'
+  // Get attendance data for the month
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 0);
+  const attendanceData = await Attendance.find({
+    date: { $gte: startDate, $lte: endDate }
   });
 
-  res.status(201).json(payroll);
+  // Group attendance by user
+  const attendanceByUser = attendanceData.reduce((acc, record) => {
+    if (!acc[record.user]) {
+      acc[record.user] = [];
+    }
+    acc[record.user].push(record);
+    return acc;
+  }, {});
+
+  // Generate payroll for each employee
+  const payrollPromises = employees.map(async (employee) => {
+    // Check if payroll already exists
+    const existingPayroll = await Payroll.findOne({ 
+      user: employee._id, 
+      month, 
+      year 
+    });
+    if (existingPayroll) {
+      return null; // Skip if payroll exists
+    }
+
+    // Check if employee joined in this month or later
+    const joiningDate = new Date(employee.joiningDate);
+    const payrollMonth = new Date(year, month - 1, 1); // First day of payroll month
+    const nextMonth = new Date(year, month, 1); // First day of next month
+
+    // Skip if employee joined after the payroll month
+    if (joiningDate >= nextMonth) {
+      return null;
+    }
+
+    // Calculate pro-rated basic salary
+    let proRatedBasicSalary = employee.basicSalary;
+    if (joiningDate > payrollMonth) {
+      // Calculate days worked in the month
+      const daysInMonth = endDate.getDate();
+      const daysWorked = daysInMonth - joiningDate.getDate() + 1;
+      // Pro-rate the salary
+      proRatedBasicSalary = (employee.basicSalary / daysInMonth) * daysWorked;
+    }
+
+    // Calculate overtime hours
+    const employeeAttendance = attendanceByUser[employee._id] || [];
+    const overtimeHours = employeeAttendance.reduce((total, record) => {
+      if (record.status === 'Present' && record.overtimeHours) {
+        return total + record.overtimeHours;
+      }
+      return total;
+    }, 0);
+
+    // Calculate tax amount based on pro-rated basic salary
+    const taxAmount = (proRatedBasicSalary * settings.payrollSettings.taxRate) / 100;
+
+    // Create default allowances and deductions
+    const allowances = [
+      {
+        type: 'Housing',
+        amount: 0,
+        description: 'Housing allowance'
+      },
+      {
+        type: 'Transport',
+        amount: 0,
+        description: 'Transport allowance'
+      }
+    ];
+
+    const deductions = [
+      {
+        type: 'Tax',
+        amount: taxAmount,
+        description: 'Income tax'
+      },
+      {
+        type: 'Insurance',
+        amount: 0,
+        description: 'Health insurance'
+      }
+    ];
+
+    // Create payroll record
+    return Payroll.create({
+      user: employee._id,
+      month,
+      year,
+      basicSalary: proRatedBasicSalary,
+      overtimeHours,
+      overtimeRate: settings.payrollSettings.overtimeRate,
+      allowances,
+      deductions,
+      taxAmount,
+      status: 'Draft',
+      remarks: joiningDate > payrollMonth ? 
+        `Pro-rated salary for joining on ${joiningDate.toLocaleDateString()}` : 
+        undefined
+    });
+  });
+
+  // Wait for all payrolls to be created
+  const results = await Promise.all(payrollPromises);
+  const createdPayrolls = results.filter(payroll => payroll !== null);
+
+  // Populate user details for the response
+  const populatedPayrolls = await Payroll.find({
+    _id: { $in: createdPayrolls.map(p => p._id) }
+  }).populate('user', 'firstName lastName email department');
+
+  // Return response with appropriate message
+  if (createdPayrolls.length === 0) {
+    return res.status(200).json({
+      message: 'No new payrolls were generated. They may already exist for this period or employees joined after this month.',
+      payrolls: []
+    });
+  }
+
+  res.status(201).json({
+    message: `Successfully generated ${createdPayrolls.length} payroll(s)`,
+    payrolls: populatedPayrolls
+  });
 });
 
 // @desc    Get all payrolls (admin)

@@ -100,16 +100,22 @@ const Payroll = () => {
   const handleOpenModal = (payroll = null) => {
     setSelectedPayroll(payroll);
     if (payroll) {
+      // Format allowances and deductions for form
+      const formattedAllowances = payroll.allowances.reduce((acc, allowance) => {
+        acc[allowance.type.toLowerCase()] = allowance.amount;
+        return acc;
+      }, {});
+
+      const formattedDeductions = payroll.deductions.reduce((acc, deduction) => {
+        acc[deduction.type.toLowerCase()] = deduction.amount;
+        return acc;
+      }, {});
+
       form.setFieldsValue({
         employee: payroll.user._id,
         basicSalary: payroll.basicSalary,
-        'allowances.housing': payroll.allowances?.housing || '',
-        'allowances.transport': payroll.allowances?.transport || '',
-        'allowances.meal': payroll.allowances?.meal || '',
-        'allowances.other': payroll.allowances?.other || '',
-        'deductions.tax': payroll.deductions?.tax || '',
-        'deductions.insurance': payroll.deductions?.insurance || '',
-        'deductions.other': payroll.deductions?.other || '',
+        allowances: formattedAllowances,
+        deductions: formattedDeductions,
         month: payroll.month,
         year: payroll.year,
       });
@@ -175,16 +181,47 @@ const Payroll = () => {
     }
   };
 
-  const handleGeneratePayroll = async () => {
+  const handleGeneratePayroll = async (type = 'bulk') => {
     try {
-      await api.post('/payroll/generate', {
-        month: selectedMonth.getMonth() + 1,
-        year: selectedMonth.getFullYear(),
-      });
-      message.success('Payroll generated successfully');
+      if (type === 'bulk') {
+        // Generate payroll for all employees
+        const response = await api.post('/payroll/generate', {
+          month: selectedMonth.getMonth() + 1,
+          year: selectedMonth.getFullYear(),
+        });
+        
+        // Show appropriate message based on response
+        if (response.data.payrolls.length === 0) {
+          message.info(response.data.message);
+        } else {
+          message.success(response.data.message);
+        }
+      } else {
+        // Generate payroll for selected employees
+        if (selectedRows.length === 0) {
+          message.warning('Please select employees to generate payroll');
+          return;
+        }
+        const response = await api.post('/payroll/generate-selected', {
+          employeeIds: selectedRows,
+          month: selectedMonth.getMonth() + 1,
+          year: selectedMonth.getFullYear(),
+        });
+        
+        if (response.data.payrolls.length === 0) {
+          message.info(response.data.message);
+        } else {
+          message.success(response.data.message);
+        }
+      }
       fetchPayrolls();
     } catch (err) {
-      message.error(err.response?.data?.message || 'Failed to generate payroll');
+      // Only show error for actual errors, not for business cases
+      if (err.response?.status === 400) {
+        message.error(err.response?.data?.message || 'Failed to generate payroll');
+      } else {
+        message.error('An unexpected error occurred');
+      }
     }
   };
 
@@ -396,6 +433,15 @@ const Payroll = () => {
     </Modal>
   );
 
+  const handleMonthChange = (date) => {
+    if (date) {
+      setSelectedMonth(date.toDate());
+    } else {
+      // If date is cleared, set to current month
+      setSelectedMonth(new Date());
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
@@ -411,75 +457,243 @@ const Payroll = () => {
   return (
     <div style={{ padding: 24 }}>
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
-        <Row justify="space-between" align="middle">
-          <Col>
-            <Title level={2}>Payroll Management</Title>
-          </Col>
-          <Col>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Title level={2}>Payroll Management</Title>
+          <Space>
+            <DatePicker.MonthPicker
+              value={selectedMonth ? dayjs(selectedMonth) : null}
+              onChange={handleMonthChange}
+              style={{ width: 200 }}
+              allowClear={false}
+            />
+            <Button
+              type="primary"
+              icon={<SyncOutlined />}
+              onClick={() => handleGeneratePayroll('bulk')}
+            >
+              Generate All Payrolls
+            </Button>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => handleOpenModal()}
+            >
+              Add Manual Payroll
+            </Button>
+          </Space>
+        </div>
+
+        {error && <Alert message={error} type="error" showIcon />}
+
+        <Card>
+          <div style={{ marginBottom: 16 }}>
             <Space>
               <Button
                 type="primary"
-                icon={<SyncOutlined />}
-                onClick={fetchPayrolls}
-                loading={loading}
+                onClick={() => handleGeneratePayroll('selected')}
+                disabled={selectedRows.length === 0}
               >
-                Refresh
+                Generate Selected Payrolls
               </Button>
               <Button
-                type="primary"
-                icon={<DollarOutlined />}
                 onClick={() => setStatusUpdateVisible(true)}
                 disabled={selectedRows.length === 0}
               >
-                Update Status ({selectedRows.length})
+                Update Status
               </Button>
             </Space>
-          </Col>
-        </Row>
+          </div>
 
-        <Row gutter={16}>
-          <Col span={8}>
-            <Card>
-              <Statistic
-                title="Total Payroll"
-                value={payrolls.reduce((sum, p) => sum + p.basicSalary, 0)}
-                prefix={<DollarOutlined />}
-                precision={2}
-              />
-            </Card>
-          </Col>
-          <Col span={8}>
-            <Card>
-              <Statistic
-                title="Total Employees"
-                value={payrolls.length}
-                prefix={<CalendarOutlined />}
-              />
-            </Card>
-          </Col>
-          <Col span={8}>
-          <Card>
-              <Statistic
-                title="Average Salary"
-                value={payrolls.length ? payrolls.reduce((sum, p) => sum + p.basicSalary, 0) / payrolls.length : 0}
-                prefix={<DollarOutlined />}
-                precision={2}
-              />
-          </Card>
-          </Col>
-        </Row>
-
-        <Card>
           <Table
-            rowSelection={rowSelection}
+            rowSelection={{
+              type: 'checkbox',
+              onChange: (selectedRowKeys) => setSelectedRows(selectedRowKeys),
+            }}
             columns={columns}
             dataSource={payrolls}
             rowKey="_id"
             loading={loading}
+            scroll={{ x: true }}
           />
         </Card>
 
-        {statusUpdateModal}
+        {/* Manual Payroll Entry Modal */}
+        <Modal
+          title={selectedPayroll ? 'Edit Payroll' : 'Add Manual Payroll'}
+          open={modalVisible}
+          onCancel={handleCloseModal}
+          footer={null}
+          width={800}
+        >
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={handleSubmit}
+          >
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  name="employee"
+                  label="Employee"
+                  rules={[{ required: true, message: 'Please select an employee' }]}
+                >
+                  <Select placeholder="Select employee">
+                    {employees.map(emp => (
+                      <Option key={emp._id} value={emp._id}>
+                        {emp.firstName} {emp.lastName}
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  name="basicSalary"
+                  label="Basic Salary"
+                  rules={[{ required: true, message: 'Please enter basic salary' }]}
+                >
+                  <InputNumber
+                    style={{ width: '100%' }}
+                    formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                    min={0}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Title level={5}>Allowances</Title>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item name={['allowances', 'housing']} label="Housing Allowance">
+                  <InputNumber
+                    style={{ width: '100%' }}
+                    formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                    min={0}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name={['allowances', 'transport']} label="Transport Allowance">
+                  <InputNumber
+                    style={{ width: '100%' }}
+                    formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                    min={0}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Title level={5}>Deductions</Title>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item name={['deductions', 'tax']} label="Tax">
+                  <InputNumber
+                    style={{ width: '100%' }}
+                    formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                    min={0}
+                  />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item name={['deductions', 'insurance']} label="Insurance">
+                  <InputNumber
+                    style={{ width: '100%' }}
+                    formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    parser={value => value.replace(/\$\s?|(,*)/g, '')}
+                    min={0}
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Form.Item>
+              <Space>
+                <Button type="primary" htmlType="submit">
+                  {selectedPayroll ? 'Update' : 'Create'} Payroll
+                </Button>
+                <Button onClick={handleCloseModal}>Cancel</Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        </Modal>
+
+        {/* Status Update Modal */}
+        <Modal
+          title="Update Payroll Status"
+          open={statusUpdateVisible}
+          onCancel={() => setStatusUpdateVisible(false)}
+          footer={null}
+        >
+          <Form
+            form={updateForm}
+            layout="vertical"
+            onFinish={handleBulkStatusUpdate}
+          >
+            <Form.Item
+              name="status"
+              label="Status"
+              rules={[{ required: true, message: 'Please select status' }]}
+            >
+              <Select>
+                <Option value="Pending">Pending</Option>
+                <Option value="Processing">Processing</Option>
+                <Option value="Paid">Paid</Option>
+                <Option value="Rejected">Rejected</Option>
+              </Select>
+            </Form.Item>
+
+            <Form.Item
+              noStyle
+              shouldUpdate={(prevValues, currentValues) => 
+                prevValues.status !== currentValues.status
+              }
+            >
+              {({ getFieldValue }) => 
+                getFieldValue('status') === 'Paid' ? (
+                  <>
+                    <Form.Item
+                      name="paymentDate"
+                      label="Payment Date"
+                      rules={[{ required: true, message: 'Please select payment date' }]}
+                    >
+                      <DatePicker style={{ width: '100%' }} />
+                    </Form.Item>
+                    <Form.Item
+                      name="paymentMethod"
+                      label="Payment Method"
+                      rules={[{ required: true, message: 'Please select payment method' }]}
+                    >
+                      <Select>
+                        <Option value="Bank Transfer">Bank Transfer</Option>
+                        <Option value="Cash">Cash</Option>
+                        <Option value="Check">Check</Option>
+                      </Select>
+                    </Form.Item>
+                  </>
+                ) : null
+              }
+            </Form.Item>
+
+            <Form.Item name="remarks" label="Remarks">
+              <Input.TextArea />
+            </Form.Item>
+
+            <Form.Item>
+              <Space>
+                <Button type="primary" htmlType="submit">
+                  Update Status
+                </Button>
+                <Button onClick={() => setStatusUpdateVisible(false)}>
+                  Cancel
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        </Modal>
       </Space>
     </div>
   );
