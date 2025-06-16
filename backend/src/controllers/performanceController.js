@@ -54,19 +54,14 @@ const createPerformanceReview = asyncHandler(async (req, res) => {
 const getPerformanceReviews = asyncHandler(async (req, res) => {
   const { status, startDate, endDate, user } = req.query;
   
-  console.log('Performance Reviews Query Params:', { status, startDate, endDate, user });
-  console.log('Request User:', { id: req.user._id, role: req.user.role });
-  
   let query = {};
   
   // If not admin, only show own reviews
   if (req.user.role !== 'admin') {
     query.user = req.user._id;
-    console.log('Employee query:', query);
   } else if (user) {
     // If admin and user specified, filter by user
     query.user = user;
-    console.log('Admin query with user filter:', query);
   }
 
   // Add filters if provided
@@ -78,20 +73,10 @@ const getPerformanceReviews = asyncHandler(async (req, res) => {
     };
   }
 
-  console.log('Final query:', JSON.stringify(query, null, 2));
-
   const reviews = await Performance.find(query)
     .populate('user', 'firstName lastName email department')
     .populate('reviewer', 'firstName lastName email')
     .sort({ reviewDate: -1 });
-
-  console.log('Found reviews count:', reviews.length);
-  console.log('First review (if any):', reviews[0] ? {
-    id: reviews[0]._id,
-    user: reviews[0].user,
-    status: reviews[0].status,
-    reviewDate: reviews[0].reviewDate
-  } : 'No reviews found');
 
   res.json(reviews);
 });

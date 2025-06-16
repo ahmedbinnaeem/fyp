@@ -41,9 +41,6 @@ const PerformancePage = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
-  console.log('PerformancePage - User:', user);
-  console.log('PerformancePage - Is Admin:', isAdmin);
-
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -55,17 +52,12 @@ const PerformancePage = () => {
   const fetchReviews = async () => {
     try {
       setLoading(true);
-      console.log('Fetching reviews for user:', user);
       
       // For employees, explicitly pass their user ID
       const url = isAdmin ? '/performance-reviews' : `/performance-reviews?user=${user._id}`;
-      console.log('Fetching from URL:', url);
-      
       const response = await api.get(url);
-      console.log('API Response:', response.data);
       
       if (!response.data) {
-        console.error('No data received from API');
         setError('No performance reviews found');
         setReviews([]);
         return;
@@ -73,7 +65,6 @@ const PerformancePage = () => {
       
       setReviews(response.data);
     } catch (err) {
-      console.error('Error fetching reviews:', err.response || err);
       setError(err.response?.data?.message || 'Failed to fetch performance reviews');
       message.error('Failed to fetch performance reviews');
       setReviews([]);
@@ -83,11 +74,10 @@ const PerformancePage = () => {
   };
 
   useEffect(() => {
-    console.log('Current user:', user);
     if (user) {
       fetchReviews();
     }
-  }, [user, isAdmin]); // Added isAdmin to dependencies since we use it in fetchReviews
+  }, [user, isAdmin]);
 
   const handleCreate = () => {
     setModalMode('create');
