@@ -44,6 +44,7 @@ const registerUser = async (req, res) => {
         department: user.department,
         basicSalary: user.basicSalary,
         gender: user.gender,
+        employeeId: user.employeeId,
         token: generateToken(user._id),
       });
     }
@@ -111,7 +112,8 @@ const getUserProfile = async (req, res) => {
         joinDate: user.joinDate,
         isActive: user.isActive,
         profileImage: user.profileImage,
-        gender: user.gender
+        gender: user.gender,
+        employeeId: user.employeeId,
       });
     } else {
       res.status(404).json({ message: 'User not found' });
@@ -167,7 +169,7 @@ const updateUserProfile = async (req, res) => {
 const getUsers = async (req, res) => {
   try {
     const users = await User.find({ role: { $ne: 'admin' } })
-      .select('firstName lastName email department role position basicSalary gender isActive joinDate');
+      .select('firstName lastName email department role position basicSalary gender isActive joinDate employeeId');
     res.json(users);
   } catch (error) {
     res.status(400).json({ message: error.message });
@@ -224,7 +226,8 @@ const updateUser = async (req, res) => {
       basicSalary: updatedUser.basicSalary,
       gender: updatedUser.gender,
       isActive: updatedUser.isActive,
-      joinDate: updatedUser.joinDate
+      joinDate: updatedUser.joinDate,
+      employeeId: updatedUser.employeeId
     });
   } catch (error) {
     res.status(400).json({ message: error.message });

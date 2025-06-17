@@ -37,7 +37,7 @@ router.get('/my-payroll', auth, async (req, res) => {
 // Update payroll status (admin only)
 router.put('/:id', [auth, admin], async (req, res) => {
   try {
-    const { status, paymentDate, paymentMethod, remarks } = req.body;
+    const { status, paymentDate, paymentMethod, remarks, allowances, deductions, basicSalary } = req.body;
 
     // First find the existing payroll
     const existingPayroll = await Payroll.findById(req.params.id);
@@ -45,35 +45,74 @@ router.put('/:id', [auth, admin], async (req, res) => {
       return res.status(404).json({ message: 'Payroll not found' });
     }
 
-    // Update only the fields we want to change
-    existingPayroll.status = status;
+    // Format allowances as array of objects if provided
+    if (allowances) {
+      const formattedAllowances = [
+        {
+          type: 'Housing',
+          amount: Number(allowances?.housing || 0),
+          description: 'Housing allowance'
+        },
+        {
+          type: 'Transport',
+          amount: Number(allowances?.transport || 0),
+          description: 'Transport allowance'
+        },
+        {
+          type: 'Meal',
+          amount: Number(allowances?.meal || 0),
+          description: 'Meal allowance'
+        },
+        {
+          type: 'Other',
+          amount: Number(allowances?.other || 0),
+          description: 'Other allowances'
+        }
+      ].filter(allowance => allowance.amount > 0);
+
+      existingPayroll.allowances = formattedAllowances;
+    }
+
+    // Format deductions as array of objects if provided
+    if (deductions) {
+      const formattedDeductions = [
+        {
+          type: 'Tax',
+          amount: Number(deductions?.tax || 0),
+          description: 'Income tax'
+        },
+        {
+          type: 'Insurance',
+          amount: Number(deductions?.insurance || 0),
+          description: 'Health insurance'
+        },
+        {
+          type: 'Other',
+          amount: Number(deductions?.other || 0),
+          description: 'Other deductions'
+        }
+      ].filter(deduction => deduction.amount > 0);
+
+      existingPayroll.deductions = formattedDeductions;
+    }
+
+    // Update other fields
+    if (status) existingPayroll.status = status;
+    if (basicSalary) existingPayroll.basicSalary = Number(basicSalary);
     if (status === 'Paid' && paymentMethod && paymentDate) {
       existingPayroll.paymentMethod = paymentMethod;
       existingPayroll.paymentDate = paymentDate;
     }
-    if (remarks) {
-      existingPayroll.remarks = remarks;
-    }
+    if (remarks) existingPayroll.remarks = remarks;
 
-    // Use updateOne to bypass schema validation
-    await Payroll.updateOne(
-      { _id: req.params.id },
-      {
-        $set: {
-          status: existingPayroll.status,
-          paymentMethod: existingPayroll.paymentMethod,
-          paymentDate: existingPayroll.paymentDate,
-          remarks: existingPayroll.remarks,
-          updatedAt: new Date()
-        }
-      }
-    );
+    // Save the updated payroll
+    const updatedPayroll = await existingPayroll.save();
 
-    // Fetch the updated document
-    const updatedPayroll = await Payroll.findById(req.params.id)
+    // Fetch the updated document with populated user
+    const populatedPayroll = await Payroll.findById(updatedPayroll._id)
       .populate('user', 'firstName lastName email');
 
-    res.json(updatedPayroll);
+    res.json(populatedPayroll);
   } catch (err) {
     console.error('Error updating payroll:', err);
     res.status(500).json({ message: err.message });

@@ -98,15 +98,6 @@ const PerformanceList = ({
               />
             </Tooltip>
 
-            {isEditable && (
-              <Tooltip title="Edit Review">
-                <Button
-                  icon={<EditOutlined />}
-                  onClick={() => onEdit(record)}
-                />
-              </Tooltip>
-            )}
-
             {isDeletable && (
               <Popconfirm
                 title="Are you sure you want to delete this review?"

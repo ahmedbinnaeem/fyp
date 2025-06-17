@@ -3,6 +3,8 @@ const User = require('../models/User');
 const Attendance = require('../models/Attendance');
 const Setting = require('../models/Setting');
 const asyncHandler = require('express-async-handler');
+const PDFDocument = require('pdfkit');
+const moment = require('moment');
 
 // @desc    Create manual payroll
 // @route   POST /api/payroll
@@ -85,7 +87,7 @@ const createPayroll = async (req, res) => {
     });
 
     const populatedPayroll = await Payroll.findById(payroll._id)
-      .populate('user', 'firstName lastName email department');
+      .populate('user', 'firstName lastName email employeeId department');
 
     res.status(201).json(populatedPayroll);
   } catch (error) {
@@ -296,7 +298,7 @@ const getPayrollById = asyncHandler(async (req, res) => {
   }
 
   // Check if user is admin or the payroll belongs to the requesting user
-  if (!req.user.isAdmin && payroll.user._id.toString() !== req.user._id.toString()) {
+  if (req.user.role !== 'admin' && payroll.user._id.toString() !== req.user._id.toString()) {
     res.status(403);
     throw new Error('Not authorized to view this payroll');
   }
@@ -304,11 +306,115 @@ const getPayrollById = asyncHandler(async (req, res) => {
   res.json(payroll);
 });
 
+// @desc    Get payslip
+// @route   GET /api/payroll/:id/payslip
+// @access  Private
+const getPayslip = asyncHandler(async (req, res) => {
+  const payroll = await Payroll.findById(req.params.id)
+    .populate('user', 'firstName lastName email employeeId department');
+
+  if (!payroll) {
+    res.status(404);
+    throw new Error('Payroll not found');
+  }
+
+  // Check if user is admin or the payroll belongs to the requesting user
+  if (req.user.role !== 'admin' && payroll.user._id.toString() !== req.user._id.toString()) {
+    res.status(403);
+    throw new Error('Not authorized to view this payslip');
+  }
+
+  // Create PDF
+  const doc = new PDFDocument();
+  
+  // Set response headers
+  const fileName = `${payroll.user.firstName}_${payroll.user.lastName}_${payroll.month}_${payroll.year}.pdf`;
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
+
+  // Pipe the PDF to the response
+  doc.pipe(res);
+
+  // Add content to PDF
+  doc.fontSize(20).text('PAYSLIP', { align: 'center' });
+  doc.moveDown();
+
+  // Employee Information
+  doc.fontSize(12).text('Employee Information', { underline: true });
+  doc.fontSize(10)
+    .text(`Name: ${payroll.user.firstName} ${payroll.user.lastName}`)
+    .text(`Employee ID: ${payroll.user.employeeId || 'N/A'}`)
+    .text(`Department: ${payroll.user.department || 'N/A'}`)
+    .text(`Period: ${payroll.month}/${payroll.year}`)
+    .text(`Status: ${payroll.status}`);
+  doc.moveDown();
+
+  // Salary Details
+  doc.fontSize(12).text('Salary Details', { underline: true });
+  doc.fontSize(10)
+    .text(`Basic Salary: $${payroll.basicSalary.toFixed(2)}`)
+    .text(`Overtime Hours: ${payroll.overtimeHours || 0}`)
+    .text(`Overtime Amount: $${(payroll.overtimeAmount || 0).toFixed(2)}`);
+  doc.moveDown();
+
+  // Allowances
+  doc.fontSize(12).text('Allowances', { underline: true });
+  if (payroll.allowances && payroll.allowances.length > 0) {
+    payroll.allowances.forEach(allowance => {
+      doc.fontSize(10).text(`${allowance.type}: $${allowance.amount.toFixed(2)}`);
+    });
+  } else {
+    doc.fontSize(10).text('No allowances');
+  }
+  doc.moveDown();
+
+  // Deductions
+  doc.fontSize(12).text('Deductions', { underline: true });
+  if (payroll.deductions && payroll.deductions.length > 0) {
+    payroll.deductions.forEach(deduction => {
+      doc.fontSize(10).text(`${deduction.type}: $${deduction.amount.toFixed(2)}`);
+    });
+  } else {
+    doc.fontSize(10).text('No deductions');
+  }
+  doc.moveDown();
+
+  // Summary
+  doc.fontSize(12).text('Summary', { underline: true });
+  const totalAllowances = payroll.allowances.reduce((sum, a) => sum + a.amount, 0);
+  const totalDeductions = payroll.deductions.reduce((sum, d) => sum + d.amount, 0);
+  const grossSalary = payroll.basicSalary + (payroll.overtimeAmount || 0) + totalAllowances;
+  const netSalary = grossSalary - totalDeductions;
+
+  doc.fontSize(10)
+    .text(`Gross Salary: $${grossSalary.toFixed(2)}`)
+    .text(`Total Deductions: $${totalDeductions.toFixed(2)}`)
+    .text(`Net Salary: $${netSalary.toFixed(2)}`);
+  doc.moveDown();
+
+  // Footer
+  doc.fontSize(8)
+    .text('This is a computer-generated document and does not require a signature.', { align: 'center' })
+    .text(`Generated on: ${moment().format('MMMM Do YYYY, h:mm:ss a')}`, { align: 'center' });
+
+  // Finalize PDF
+  doc.end();
+});
+
 // @desc    Update payroll status
 // @route   PUT /api/payroll/:id
 // @access  Private/Admin
 const updatePayrollStatus = asyncHandler(async (req, res) => {
-  const { status, paymentDate, paymentMethod, remarks } = req.body;
+  const { 
+    status, 
+    paymentDate, 
+    paymentMethod, 
+    remarks,
+    basicSalary,
+    allowances,
+    deductions,
+    netSalary
+  } = req.body;
 
   const payroll = await Payroll.findById(req.params.id);
 
@@ -317,6 +423,17 @@ const updatePayrollStatus = asyncHandler(async (req, res) => {
     throw new Error('Payroll not found');
   }
 
+  // If payroll is already paid, return success with message
+  if (payroll.status === 'Paid') {
+    const populatedPayroll = await Payroll.findById(payroll._id)
+      .populate('user', 'firstName lastName email employeeId department');
+    return res.status(200).json({
+      ...populatedPayroll.toObject(),
+      message: 'Cannot update a payroll that has already been paid'
+    });
+  }
+
+  // Update basic fields
   payroll.status = status;
   if (status === 'Paid') {
     payroll.paymentDate = paymentDate || new Date();
@@ -326,9 +443,27 @@ const updatePayrollStatus = asyncHandler(async (req, res) => {
     payroll.remarks = remarks;
   }
 
+  // Update salary related fields if provided
+  if (basicSalary !== undefined) {
+    payroll.basicSalary = Number(basicSalary);
+  }
+  if (allowances) {
+    payroll.allowances = allowances;
+  }
+  if (deductions) {
+    payroll.deductions = deductions;
+  }
+  if (netSalary !== undefined) {
+    payroll.netSalary = Number(netSalary);
+  }
+
   const updatedPayroll = await payroll.save();
 
-  res.json(updatedPayroll);
+  // Populate user details before sending response
+  const populatedPayroll = await Payroll.findById(updatedPayroll._id)
+    .populate('user', 'firstName lastName email employeeId department');
+
+  res.json(populatedPayroll);
 });
 
 // @desc    Delete payroll
@@ -385,4 +520,5 @@ module.exports = {
   updatePayrollStatus,
   deletePayroll,
   getPayrollStats,
+  getPayslip,
 }; 

@@ -3,6 +3,11 @@ const bcrypt = require('bcryptjs');
 const Setting = require('./Setting');
 
 const userSchema = new mongoose.Schema({
+  employeeId: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
   firstName: {
     type: String,
     required: true,
@@ -91,10 +96,16 @@ userSchema.pre('save', async function(next) {
   try {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
-    next();
   } catch (error) {
-    next(error);
+    return next(error);
   }
+
+  if (this.isNew && !this.employeeId && this.role !== 'admin') {
+    const count = await this.constructor.countDocuments();
+    const year = new Date().getFullYear().toString().slice(-2);
+    this.employeeId = `EMP${year}${(count + 1).toString().padStart(4, '0')}`;
+  }
+  next();
 });
 
 // Method to compare password

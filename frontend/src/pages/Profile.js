@@ -11,7 +11,6 @@ import {
   Row,
   Col,
   Divider,
-  Space,
   message,
 } from 'antd';
 import {
@@ -20,6 +19,7 @@ import {
   PhoneOutlined,
   HomeOutlined,
   LockOutlined,
+  IdcardOutlined,
 } from '@ant-design/icons';
 import { useSelector, useDispatch } from 'react-redux';
 import { getUserProfile } from '../store/slices/authSlice';
@@ -33,58 +33,21 @@ const Profile = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [settings, setSettings] = useState(null);
   const [form] = Form.useForm();
   const [passwordForm] = Form.useForm();
 
   useEffect(() => {
     if (user) {
-      // Extract username from email for editing
-      const domain = settings?.companyName ? 
-        `@${settings.companyName.toLowerCase().replace(/\s+/g, '')}.com` : '';
-      const username = user.email.replace(domain, '');
-
       form.setFieldsValue({
         firstName: user.firstName || '',
         lastName: user.lastName || '',
-        email: username,
+        email: user.email || '',
         phone: user.phoneNumber || '',
         address: user.address || '',
+        employeeId: user.employeeId || '',
       });
     }
-    fetchSettings();
-  }, [user, form, settings]);
-
-  const fetchSettings = async () => {
-    try {
-      const response = await api.get('/settings');
-      setSettings(response.data);
-    } catch (err) {
-      message.error('Failed to fetch company settings');
-    }
-  };
-
-  const validateEmail = (_, value) => {
-    if (!value) {
-      return Promise.reject('Please enter username');
-    }
-
-    if (!settings || !settings.companyName) {
-      return Promise.reject('Company settings not configured');
-    }
-
-    // Skip validation for admin users
-    if (user.role === 'admin') {
-      return Promise.resolve();
-    }
-
-    // Only validate the username part
-    if (!/^[a-zA-Z0-9._-]+$/.test(value)) {
-      return Promise.reject('Username can only contain letters, numbers, dots, underscores and hyphens');
-    }
-
-    return Promise.resolve();
-  };
+  }, [user, form]);
 
   const handleUpdateProfile = async (values) => {
     try {
@@ -93,10 +56,6 @@ const Profile = () => {
       setSuccess(null);
 
       const { phone, ...profileData } = values;
-
-      // Construct the full email with domain
-      const domain = `@${settings.companyName.toLowerCase().replace(/\s+/g, '')}.com`;
-      profileData.email = values.email + domain;
 
       // Map phone to phoneNumber
       if (phone) {
@@ -133,13 +92,15 @@ const Profile = () => {
     }
   };
 
-  if (!user) {
+  if (loading && !user) {
     return (
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '200px' }}>
         <Spin size="large" />
       </div>
     );
   }
+
+  const isAdmin = user?.role === 'admin';
 
   return (
     <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px' }}>
@@ -165,15 +126,22 @@ const Profile = () => {
                   marginBottom: 16,
                 }}
               >
-                {user.firstName[0]}
-                {user.lastName[0]}
+                {user?.firstName?.[0]}
+                {user?.lastName?.[0]}
               </Avatar>
               <Title level={4} style={{ marginBottom: 4 }}>
-                {user.firstName} {user.lastName}
+                {user?.firstName} {user?.lastName}
               </Title>
               <Text type="secondary" style={{ textTransform: 'capitalize' }}>
-                {user.position || user.role}
+                {user?.position || user?.role}
               </Text>
+              {user?.employeeId && (
+                <div style={{ marginTop: 8 }}>
+                  <Text type="secondary">
+                    <IdcardOutlined /> Employee ID: {user.employeeId}
+                  </Text>
+                </div>
+              )}
             </div>
           </Card>
         </Col>
@@ -184,13 +152,6 @@ const Profile = () => {
               form={form}
               layout="vertical"
               onFinish={handleUpdateProfile}
-              initialValues={{
-                firstName: user.firstName || '',
-                lastName: user.lastName || '',
-                email: user.email || '',
-                phone: user.phoneNumber || '',
-                address: user.address || '',
-              }}
             >
               <Row gutter={16}>
                 <Col xs={24} sm={12}>
@@ -199,7 +160,10 @@ const Profile = () => {
                     label="First Name"
                     rules={[{ required: true, message: 'Please input your first name!' }]}
                   >
-                    <Input prefix={<UserOutlined />} />
+                    <Input 
+                      prefix={<UserOutlined />} 
+                      disabled={!isAdmin}
+                    />
                   </Form.Item>
                 </Col>
                 <Col xs={24} sm={12}>
@@ -208,28 +172,35 @@ const Profile = () => {
                     label="Last Name"
                     rules={[{ required: true, message: 'Please input your last name!' }]}
                   >
-                    <Input prefix={<UserOutlined />} />
+                    <Input 
+                      prefix={<UserOutlined />} 
+                      disabled={!isAdmin}
+                    />
                   </Form.Item>
                 </Col>
               </Row>
 
               <Form.Item
                 name="email"
-                label="Email Username"
+                label="Email"
                 rules={[
-                  { required: true, message: 'Please enter username' },
-                  { validator: validateEmail }
+                  { required: true, message: 'Please enter email' },
+                  { type: 'email', message: 'Please enter a valid email' }
                 ]}
-                extra={user.role !== 'admin' && settings?.companyName ? 
-                  `Enter username only - full email will be username@${settings.companyName.toLowerCase().replace(/\s+/g, '')}.com` : 
-                  undefined}
               >
                 <Input 
-                  prefix={<MailOutlined />}
-                  placeholder="username"
-                  addonAfter={settings?.companyName ? 
-                    `@${settings.companyName.toLowerCase().replace(/\s+/g, '')}.com` : 
-                    'Loading...'}
+                  prefix={<MailOutlined />} 
+                  disabled={!isAdmin}
+                />
+              </Form.Item>
+
+              <Form.Item
+                name="employeeId"
+                label="Employee ID"
+              >
+                <Input 
+                  prefix={<IdcardOutlined />} 
+                  disabled={true}
                 />
               </Form.Item>
 

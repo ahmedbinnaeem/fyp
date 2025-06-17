@@ -156,6 +156,11 @@ const Employees = () => {
       render: (_, record) => `${record.firstName} ${record.lastName}`,
     },
     {
+      title: 'Employee ID',
+      dataIndex: 'employeeId',
+      key: 'employeeId',
+    },
+    {
       title: 'Email',
       dataIndex: 'email',
       key: 'email',

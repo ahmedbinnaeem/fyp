@@ -57,6 +57,10 @@ export const updatePayrollStatus = createAsyncThunk(
           headers: { Authorization: `Bearer ${auth.token}` },
         }
       );
+      // If the response contains a message about paid payroll, treat it as an error
+      if (data.message && data.message.includes('already been paid')) {
+        return rejectWithValue(data.message);
+      }
       return data;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to update payroll status');

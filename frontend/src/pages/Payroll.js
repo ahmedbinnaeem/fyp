@@ -20,7 +20,8 @@ import {
   InputNumber,
   Tag,
   Tooltip,
-  Popconfirm
+  Popconfirm,
+  Descriptions
 } from 'antd';
 import {
   EditOutlined,
@@ -30,7 +31,8 @@ import {
   CalendarOutlined,
   SyncOutlined,
   CheckOutlined,
-  CloseOutlined
+  CloseOutlined,
+  EyeOutlined
 } from '@ant-design/icons';
 import api from '../utils/axios';
 import dayjs from 'dayjs';
@@ -66,6 +68,8 @@ const Payroll = () => {
   const [selectedRows, setSelectedRows] = useState([]);
   const [statusUpdateVisible, setStatusUpdateVisible] = useState(false);
   const [updateForm] = Form.useForm();
+  const [payslipModalVisible, setPayslipModalVisible] = useState(false);
+  const [selectedPayslip, setSelectedPayslip] = useState(null);
 
   const fetchPayrolls = useCallback(async () => {
     try {
@@ -138,23 +142,67 @@ const Payroll = () => {
   const handleSubmit = async (values) => {
     try {
       // Extract and convert allowances
-      const allowances = {
-        housing: values['allowances.housing'] ? Number(values['allowances.housing']) : 0,
-        transport: values['allowances.transport'] ? Number(values['allowances.transport']) : 0,
-        meal: values['allowances.meal'] ? Number(values['allowances.meal']) : 0,
-        other: values['allowances.other'] ? Number(values['allowances.other']) : 0
-      };
+      const allowances = [];
+      if (values.allowances) {
+        if (values.allowances.housing) {
+          allowances.push({
+            type: 'Housing',
+            amount: Number(values.allowances.housing),
+            description: 'Housing allowance'
+          });
+        }
+        if (values.allowances.transport) {
+          allowances.push({
+            type: 'Transport',
+            amount: Number(values.allowances.transport),
+            description: 'Transport allowance'
+          });
+        }
+        if (values.allowances.meal) {
+          allowances.push({
+            type: 'Meal',
+            amount: Number(values.allowances.meal),
+            description: 'Meal allowance'
+          });
+        }
+        if (values.allowances.other) {
+          allowances.push({
+            type: 'Other',
+            amount: Number(values.allowances.other),
+            description: 'Other allowances'
+          });
+        }
+      }
 
       // Extract and convert deductions
-      const deductions = {
-        tax: values['deductions.tax'] ? Number(values['deductions.tax']) : 0,
-        insurance: values['deductions.insurance'] ? Number(values['deductions.insurance']) : 0,
-        other: values['deductions.other'] ? Number(values['deductions.other']) : 0
-      };
+      const deductions = [];
+      if (values.deductions) {
+        if (values.deductions.tax) {
+          deductions.push({
+            type: 'Tax',
+            amount: Number(values.deductions.tax),
+            description: 'Income tax'
+          });
+        }
+        if (values.deductions.insurance) {
+          deductions.push({
+            type: 'Insurance',
+            amount: Number(values.deductions.insurance),
+            description: 'Health insurance'
+          });
+        }
+        if (values.deductions.other) {
+          deductions.push({
+            type: 'Other',
+            amount: Number(values.deductions.other),
+            description: 'Other deductions'
+          });
+        }
+      }
 
       // Calculate totals
-      const totalAllowances = Object.values(allowances).reduce((a, b) => a + b, 0);
-      const totalDeductions = Object.values(deductions).reduce((a, b) => a + b, 0);
+      const totalAllowances = allowances.reduce((sum, a) => sum + a.amount, 0);
+      const totalDeductions = deductions.reduce((sum, d) => sum + d.amount, 0);
       const netSalary = Number(values.basicSalary) + totalAllowances - totalDeductions;
 
       const payload = {
@@ -164,11 +212,20 @@ const Payroll = () => {
         basicSalary: Number(values.basicSalary),
         allowances,
         deductions,
-        netSalary
+        netSalary,
+        status: selectedPayroll?.status || 'DRAFT' // Preserve existing status or set to DRAFT
       };
 
       if (selectedPayroll) {
-        await api.put(`/payroll/${selectedPayroll._id}`, payload);
+        // For updates, we need to include all fields
+        const updatePayload = {
+          ...payload,
+          status: selectedPayroll.status,
+          paymentDate: selectedPayroll.paymentDate,
+          paymentMethod: selectedPayroll.paymentMethod,
+          remarks: selectedPayroll.remarks
+        };
+        await api.put(`/payroll/${selectedPayroll._id}`, updatePayload);
         message.success('Payroll updated successfully');
       } else {
         await api.post('/payroll', payload);
@@ -244,11 +301,13 @@ const Payroll = () => {
   };
 
   const calculateTotalAllowances = (allowances) => {
-    return Object.values(allowances).reduce((sum, value) => sum + (Number(value) || 0), 0);
+    if (!allowances || !Array.isArray(allowances)) return 0;
+    return allowances.reduce((sum, allowance) => sum + (Number(allowance.amount) || 0), 0);
   };
 
   const calculateTotalDeductions = (deductions) => {
-    return Object.values(deductions).reduce((sum, value) => sum + (Number(value) || 0), 0);
+    if (!deductions || !Array.isArray(deductions)) return 0;
+    return deductions.reduce((sum, deduction) => sum + (Number(deduction.amount) || 0), 0);
   };
 
   const getStatusTag = (status) => {
@@ -289,6 +348,133 @@ const Payroll = () => {
     }
   };
 
+  const handleViewPayslip = async (record) => {
+    try {
+      const response = await api.get(`/payroll/${record._id}`);
+      setSelectedPayslip(response.data);
+      setPayslipModalVisible(true);
+    } catch (err) {
+      message.error(err.response?.data?.message || 'Failed to fetch payslip details');
+    }
+  };
+
+  const renderPayslipModal = () => {
+    if (!selectedPayslip) return null;
+
+    // Calculate totals
+    const totalAllowances = calculateTotalAllowances(selectedPayslip.allowances);
+    const totalDeductions = calculateTotalDeductions(selectedPayslip.deductions);
+    const grossSalary = Number(selectedPayslip.basicSalary) + totalAllowances;
+    const netSalary = grossSalary - totalDeductions;
+
+    return (
+      <Modal
+        title="Payslip Details"
+        open={payslipModalVisible}
+        onCancel={() => {
+          setPayslipModalVisible(false);
+          setSelectedPayslip(null);
+        }}
+        footer={[
+          <Button 
+            key="download" 
+            type="primary" 
+            icon={<DownloadOutlined />}
+            onClick={() => handleDownloadPayslip(selectedPayslip._id)}
+          >
+            Download
+          </Button>,
+          <Button 
+            key="close" 
+            onClick={() => {
+              setPayslipModalVisible(false);
+              setSelectedPayslip(null);
+            }}
+          >
+            Close
+          </Button>
+        ]}
+        width={800}
+      >
+        <Descriptions bordered column={2}>
+          <Descriptions.Item label="Employee">
+            {selectedPayslip.user?.firstName} {selectedPayslip.user?.lastName}
+          </Descriptions.Item>
+          <Descriptions.Item label="Period">
+            {selectedPayslip.month}/{selectedPayslip.year}
+          </Descriptions.Item>
+          <Descriptions.Item label="Status">
+            {getStatusTag(selectedPayslip.status)}
+          </Descriptions.Item>
+          <Descriptions.Item label="Basic Salary">
+            {formatCurrency(selectedPayslip.basicSalary)}
+          </Descriptions.Item>
+        </Descriptions>
+
+        <Title level={5} style={{ marginTop: 24 }}>Allowances</Title>
+        <Table
+          dataSource={selectedPayslip.allowances || []}
+          columns={[
+            { title: 'Type', dataIndex: 'type' },
+            { 
+              title: 'Amount', 
+              dataIndex: 'amount',
+              render: (value) => formatCurrency(Number(value) || 0)
+            },
+            { title: 'Description', dataIndex: 'description' }
+          ]}
+          pagination={false}
+          size="small"
+          locale={{ emptyText: 'No allowances' }}
+        />
+
+        <Title level={5} style={{ marginTop: 24 }}>Deductions</Title>
+        <Table
+          dataSource={selectedPayslip.deductions || []}
+          columns={[
+            { title: 'Type', dataIndex: 'type' },
+            { 
+              title: 'Amount', 
+              dataIndex: 'amount',
+              render: (value) => formatCurrency(Number(value) || 0)
+            },
+            { title: 'Description', dataIndex: 'description' }
+          ]}
+          pagination={false}
+          size="small"
+          locale={{ emptyText: 'No deductions' }}
+        />
+
+        <Row gutter={16} style={{ marginTop: 24 }}>
+          <Col span={8}>
+            <Statistic 
+              title="Gross Salary" 
+              value={grossSalary} 
+              prefix="$"
+              precision={2}
+            />
+          </Col>
+          <Col span={8}>
+            <Statistic 
+              title="Total Deductions" 
+              value={totalDeductions}
+              prefix="$"
+              precision={2}
+            />
+          </Col>
+          <Col span={8}>
+            <Statistic 
+              title="Net Salary" 
+              value={netSalary}
+              prefix="$"
+              precision={2}
+            />
+          </Col>
+        </Row>
+      </Modal>
+    );
+  };
+
   const columns = [
     {
       title: 'Employee',
@@ -322,20 +508,25 @@ const Payroll = () => {
       },
     },
     {
+      title: 'Status',
+      key: 'status',
+      render: (_, record) => getStatusTag(record.status),
+    },
+    {
       title: 'Actions',
       key: 'actions',
       render: (_, record) => (
         <Space>
-          <Button
+          {record.status !== 'Paid' && record.status !== 'Rejected' && <Button
             type="link"
             icon={<EditOutlined />}
             onClick={() => handleOpenModal(record)}
-          />
-          {/* <Button
+          />}
+          <Button
             type="link"
-            icon={<DownloadOutlined />}
-            onClick={() => handleDownloadPayslip(record._id)}
-          /> */}
+            icon={<EyeOutlined />}
+            onClick={() => handleViewPayslip(record)}
+          />
         </Space>
       ),
     },
@@ -488,13 +679,6 @@ const Payroll = () => {
         <Card>
           <div style={{ marginBottom: 16 }}>
             <Space>
-              <Button
-                type="primary"
-                onClick={() => handleGeneratePayroll('selected')}
-                disabled={selectedRows.length === 0}
-              >
-                Generate Selected Payrolls
-              </Button>
               <Button
                 onClick={() => setStatusUpdateVisible(true)}
                 disabled={selectedRows.length === 0}
@@ -695,6 +879,7 @@ const Payroll = () => {
           </Form>
         </Modal>
       </Space>
+      {renderPayslipModal()}
     </div>
   );
 };
